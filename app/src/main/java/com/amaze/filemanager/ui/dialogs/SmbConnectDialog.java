@@ -13,9 +13,12 @@ import android.support.annotation.NonNull;
 import android.support.design.widget.TextInputLayout;
 import android.support.v7.widget.AppCompatCheckBox;
 import android.support.v7.widget.AppCompatEditText;
+import android.support.v7.widget.AppCompatSpinner;
 import android.text.Editable;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.SimpleAdapter;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -79,9 +82,14 @@ public class SmbConnectDialog extends DialogFragment {
         void deleteConnection(String name, String path);
     }
 
-    Context context;
-    SmbConnectionListener smbConnectionListener;
-    String emptyAddress, emptyName,invalidDomain,invalidUsername;
+    private Context context;
+    private SmbConnectionListener smbConnectionListener;
+    private String emptyAddress, emptyName,invalidDomain,invalidUsername;
+    private TextInputLayout connectionTIL, ipTIL, domainTIL, usernameTIL;
+    private AppCompatEditText conName, ip, domain, user, pass;
+    private AppCompatSpinner smbSpinner;
+    private AppCompatCheckBox rememberPasswordCheckBox, anonymousCheckBox;
+    private View rootView;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -107,12 +115,19 @@ public class SmbConnectDialog extends DialogFragment {
         final MaterialDialog.Builder ba3 = new MaterialDialog.Builder(context);
         ba3.title((R.string.smb_con));
         ba3.autoDismiss(false);
-        final View v2 = getActivity().getLayoutInflater().inflate(R.layout.smb_dialog, null);
-        final TextInputLayout connectionTIL = (TextInputLayout)v2.findViewById(R.id.connectionTIL);
-        final TextInputLayout ipTIL = (TextInputLayout)v2.findViewById(R.id.ipTIL);
-        final TextInputLayout domainTIL = (TextInputLayout)v2.findViewById(R.id.domainTIL);
-        final TextInputLayout usernameTIL = (TextInputLayout)v2.findViewById(R.id.usernameTIL);
-        final AppCompatEditText conName = (AppCompatEditText) v2.findViewById(R.id.connectionET);
+        rootView = getActivity().getLayoutInflater().inflate(R.layout.smb_dialog, null);
+        connectionTIL = (TextInputLayout)rootView.findViewById(R.id.connectionTIL);
+        ipTIL = (TextInputLayout)rootView.findViewById(R.id.ipTIL);
+        domainTIL = (TextInputLayout)rootView.findViewById(R.id.domainTIL);
+        usernameTIL = (TextInputLayout)rootView.findViewById(R.id.usernameTIL);
+        conName = (AppCompatEditText) rootView.findViewById(R.id.connectionET);
+        rememberPasswordCheckBox = (AppCompatCheckBox) rootView.findViewById(R.id.checkbox_remember_password);
+        smbSpinner = (AppCompatSpinner) rootView.findViewById(R.id.spinner_smb);
+
+        ArrayAdapter<CharSequence> smbVersionsAdapter = ArrayAdapter.createFromResource(getActivity(),
+                R.array.smb_versions, android.R.layout.simple_spinner_item);
+        smbVersionsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        smbSpinner.setAdapter(smbVersionsAdapter);
 
         conName.addTextChangedListener(new SimpleTextWatcher() {
             @Override
@@ -122,7 +137,8 @@ public class SmbConnectDialog extends DialogFragment {
                 else connectionTIL.setError("");
             }
         });
-        final AppCompatEditText ip = (AppCompatEditText) v2.findViewById(R.id.ipET);
+
+        ip = (AppCompatEditText) rootView.findViewById(R.id.ipET);
         ip.addTextChangedListener(new SimpleTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
@@ -131,7 +147,8 @@ public class SmbConnectDialog extends DialogFragment {
                 else ipTIL.setError("");
             }
         });
-        final AppCompatEditText domain = (AppCompatEditText) v2.findViewById(R.id.domainET);
+
+        domain = (AppCompatEditText) rootView.findViewById(R.id.domainET);
         domain.addTextChangedListener(new SimpleTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
@@ -140,7 +157,8 @@ public class SmbConnectDialog extends DialogFragment {
                 else domainTIL.setError("");
             }
         });
-        final AppCompatEditText user = (AppCompatEditText) v2.findViewById(R.id.usernameET);
+
+        user = (AppCompatEditText) rootView.findViewById(R.id.usernameET);
         user.addTextChangedListener(new SimpleTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
@@ -149,16 +167,20 @@ public class SmbConnectDialog extends DialogFragment {
                 else usernameTIL.setError("");
             }
         });
+
         int accentColor = utilsProvider.getColorPreference().getColor(ColorUsage.ACCENT);
-        final AppCompatEditText pass = (AppCompatEditText) v2.findViewById(R.id.passwordET);
-        final AppCompatCheckBox ch = (AppCompatCheckBox) v2.findViewById(R.id.checkBox2);
-        TextView help = (TextView) v2.findViewById(R.id.wanthelp);
+
+        pass = (AppCompatEditText) rootView.findViewById(R.id.passwordET);
+
+        anonymousCheckBox = (AppCompatCheckBox) rootView.findViewById(R.id.checkBox2);
+
+        TextView help = (TextView) rootView.findViewById(R.id.wanthelp);
 
         EditTextColorStateUtil.setTint(context, conName, accentColor);
         EditTextColorStateUtil.setTint(context, user, accentColor);
         EditTextColorStateUtil.setTint(context, pass, accentColor);
 
-        Utils.setTint(context, ch, accentColor);
+        Utils.setTint(context, anonymousCheckBox, accentColor);
         help.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -167,10 +189,10 @@ public class SmbConnectDialog extends DialogFragment {
             }
         });
 
-        ch.setOnClickListener(new View.OnClickListener() {
+        anonymousCheckBox.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (ch.isChecked()) {
+                if (anonymousCheckBox.isChecked()) {
                     user.setEnabled(false);
                     pass.setEnabled(false);
                 } else {
@@ -199,7 +221,7 @@ public class SmbConnectDialog extends DialogFragment {
                     domain.setText(domainp);
                     user.setText(userp);
                     pass.setText(passp);
-                } else ch.setChecked(true);
+                } else anonymousCheckBox.setChecked(true);
                 ipp = a.getHost();
                 ip.setText(ipp);
             } catch (UnsupportedEncodingException e) {
@@ -217,7 +239,7 @@ public class SmbConnectDialog extends DialogFragment {
             conName.requestFocus();
         }
 
-        ba3.customView(v2, true);
+        ba3.customView(rootView, true);
         ba3.theme(utilsProvider.getAppTheme().getMaterialDialogTheme());
         ba3.neutralText(R.string.cancel);
         ba3.positiveText(R.string.create);
@@ -260,7 +282,7 @@ public class SmbConnectDialog extends DialogFragment {
                 }
                 SmbFile smbFile;
                 String domaind = domain.getText().toString();
-                if (ch.isChecked())
+                if (rememberPasswordCheckBox.isChecked())
                     smbFile = createSMBPath(new String[]{ipa, "", "",domaind}, true);
                 else {
                     String useraw = user.getText().toString();

@@ -4,6 +4,7 @@
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
+
     <android.support.design.widget.TextInputLayout
         android:layout_width="match_parent"
         app:errorEnabled="true"
@@ -76,12 +77,35 @@
             android:id="@+id/passwordET"
             android:layout_gravity="center_horizontal" />
     </android.support.design.widget.TextInputLayout>
-    <android.support.v7.widget.AppCompatCheckBox
+
+    <android.support.v7.widget.AppCompatSpinner
+        android:id="@+id/spinner_smb"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/anonymous"
-        android:id="@+id/checkBox2"
-        android:layout_gravity="center_horizontal" />
+        android:layout_marginBottom="@dimen/material_generic"
+        />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="@dimen/material_generic"
+        >
+
+        <android.support.v7.widget.AppCompatCheckBox
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/anonymous"
+            android:id="@+id/checkBox2" />
+
+        <android.support.v7.widget.AppCompatCheckBox
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/remember_password"
+            android:id="@+id/checkbox_remember_password"
+            />
+    </LinearLayout>
+
     <TextView
         android:layout_width="wrap_content"
         android:id="@+id/wanthelp"

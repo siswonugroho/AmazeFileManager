@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="smb_versions">
+        <item>SMB v1</item>
+        <item>SMB v2</item>
+    </string-array>
+</resources>
