@@ -1,5 +1,6 @@
 package com.amaze.filemanager.utils;
 
+import com.amaze.filemanager.database.models.SmbModel;
 import com.amaze.filemanager.ui.drawer.Item;
 import com.cloudrail.si.interfaces.CloudStorage;
 import com.cloudrail.si.services.Box;
@@ -27,7 +28,8 @@ public class DataUtils {
             listfiles = new ArrayList<>(), history = new ArrayList<>(), storages = new ArrayList<>();
 
     private ArrayList<Item> list = new ArrayList<>();
-    private ArrayList<String[]> servers = new ArrayList<>(), books = new ArrayList<>();
+    private ArrayList<SmbModel> servers = new ArrayList<>();
+    private ArrayList<String[]> books = new ArrayList<>();
 
     private ArrayList<CloudStorage> accounts = new ArrayList<>(4);
 
@@ -42,20 +44,24 @@ public class DataUtils {
         return sDataUtils;
     }
 
-    public int containsServer(String[] a) {
-        return contains(a, servers);
+    public int containsServer(SmbModel smbModel) {
+        if (smbModel == null) return -1;
+
+        if (servers.contains(smbModel)) {
+            return 1;
+        }
+        return -1;
     }
 
-    public int containsServer(String path) {
+    public int containsServer(String name, String path) {
 
         synchronized (servers) {
 
             if (servers == null) return -1;
-            int i = 0;
-            for (String[] x : servers) {
-                if (x[1].equals(path)) return i;
+            int i = -1;
+            for (SmbModel x : servers) {
                 i++;
-
+                if (x.getName().equals(name) && x.getPath().equals(path)) return i;
             }
         }
         return -1;
@@ -130,7 +136,7 @@ public class DataUtils {
         return -1;
     }
 
-    int contains(String[] a, ArrayList<String[]> b) {
+    private int contains(String[] a, ArrayList<String[]> b) {
         if (b == null) return -1;
         int i = 0;
         for (String[] x : b) {
@@ -217,7 +223,7 @@ public class DataUtils {
         accounts.add(storage);
     }
 
-    public void addServer(String[] i) {
+    public void addServer(SmbModel i) {
         servers.add(i);
     }
 
@@ -280,7 +286,7 @@ public class DataUtils {
         Collections.sort(books, new BookSorter());
     }
 
-    public synchronized void setServers(ArrayList<String[]> servers) {
+    public synchronized void setServers(ArrayList<SmbModel> servers) {
         if (servers != null)
             this.servers = servers;
     }
@@ -295,7 +301,7 @@ public class DataUtils {
             this.accounts = accounts;
     }
 
-    public synchronized ArrayList<String[]> getServers() {
+    public synchronized ArrayList<SmbModel> getServers() {
         return servers;
     }
 
@@ -331,6 +337,28 @@ public class DataUtils {
             }
         }
         return null;
+    }
+
+    public synchronized SmbModel getServer(String name, String path) {
+        for (SmbModel smbModel : servers) {
+            if (smbModel.getName().equals(name) && smbModel.getPath().equals(path)) {
+                return smbModel;
+            }
+        }
+        return null;
+    }
+
+    public synchronized ArrayList<String[]> getServerArray() {
+
+        ArrayList serversToStringArray = new ArrayList();
+        for (int i = 0; i<servers.size(); i++) {
+            String[] serverNameAndPath = new String[] {
+                    servers.get(i).getName(),
+                    servers.get(i).getPath()
+            };
+            serversToStringArray.add(i, serverNameAndPath);
+        }
+        return getServerArray();
     }
 
     public ArrayList<String> getHiddenfiles() {

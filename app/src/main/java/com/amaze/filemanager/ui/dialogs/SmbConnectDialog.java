@@ -52,6 +52,11 @@ public class SmbConnectDialog extends DialogFragment {
 
     private static final String TAG = "SmbConnectDialog";
 
+    public static final String KEY_NAME = "name";
+    public static final String KEY_PATH = "path";
+    public static final String KEY_EDIT = "edit";
+    public static final String KEY_SMB_VERSION = "smb_version";
+
     public interface SmbConnectionListener {
 
         /**
@@ -65,9 +70,13 @@ public class SmbConnectDialog extends DialogFragment {
          * @param oldname the old name of connection if we're here to edit
          * @param oldPath the old full path (un-encrypted as we read from existing entry in db, which
          *                we decrypted beforehand).
+         * @param smbVersion the version of smb protocol to use
+         * @param rememberPassword whether to save password in database or not, if not then a dummy
+         *                         non encrypted string will be saved in database so as not to expose
+         *                         any vulnerability in encryption
          */
         void addSmbConnection(boolean edit, String name, String path, String encryptedPath,
-                           String oldname, String oldPath, SmbUtil.SMB_VERSION smbVersion);
+                           String oldname, String oldPath, SmbUtil.SMB_VERSION smbVersion, boolean rememberPassword);
 
         /**
          * Callback denoting a connection been deleted from dialog
@@ -102,9 +111,11 @@ public class SmbConnectDialog extends DialogFragment {
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
 
-        final boolean edit = getArguments().getBoolean("edit",false);
-        final String path = getArguments().getString("path");
-        final String name = getArguments().getString("name");
+        final boolean edit = getArguments().getBoolean(KEY_EDIT, false);
+        final String path = getArguments().getString(KEY_PATH);
+        final String name = getArguments().getString(KEY_NAME);
+        smbVersion = SmbUtil.getSmbVersion(getArguments().getInt(KEY_SMB_VERSION));
+
         context=getActivity();
         emptyAddress = String.format(getString(R.string.cantbeempty),getString(R.string.ip) );
         emptyName = String.format(getString(R.string.cantbeempty),getString(R.string.connectionname) );
@@ -152,6 +163,8 @@ public class SmbConnectDialog extends DialogFragment {
                 // empty
             }
         });
+        // we have versions with offset 1 relative to position
+        smbSpinner.setSelection(smbVersion.getVersion()-1);
 
         conName.addTextChangedListener(new SimpleTextWatcher() {
             @Override
@@ -246,10 +259,17 @@ public class SmbConnectDialog extends DialogFragment {
                     passp = inf.substring(inf.indexOf(":") + 1, inf.length());
                     domain.setText(domainp);
                     user.setText(userp);
-                    pass.setText(passp);
+
+                    if (!passp.equals(SmbUtil.SMB_NO_PASSWORD)) {
+                        rememberPasswordCheckBox.setChecked(true);
+                        pass.setText("");
+                    } else {
+                        pass.setText(passp);
+                    }
                 } else anonymousCheckBox.setChecked(true);
                 ipp = a.getHost();
                 ip.setText(ipp);
+                smbSpinner.setEnabled(false);
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
             } catch (MalformedURLException e) {
@@ -325,6 +345,7 @@ public class SmbConnectDialog extends DialogFragment {
                     return;
 
                 try {
+
                     s = new String[]{conName.getText().toString(), SmbUtil.getSmbEncryptedPath(getActivity(),
                             smbFile.getPath())};
                 } catch (CryptException e) {
@@ -336,7 +357,7 @@ public class SmbConnectDialog extends DialogFragment {
                 if(smbConnectionListener != null) {
                     // encrypted path means path with encrypted pass
                     smbConnectionListener.addSmbConnection(edit, s[0], smbFile.getPath(), s[1],
-                            name, path, smbVersion);
+                            name, path, smbVersion, rememberPasswordCheckBox.isChecked());
                 }
                 dismiss();
             }

@@ -74,7 +74,7 @@ public class SmbUtil {
      */
     public static String getSmbEncryptedPath(Context context, String path) throws CryptException {
 
-        if (!(path.contains(":") && path.contains("@"))) {
+        if (!validatePath(path)) {
             // smb path doesn't have any credentials
             return path;
         }
@@ -92,5 +92,48 @@ public class SmbUtil {
         buffer.append(path.substring(path.lastIndexOf("@"), path.length()));
 
         return buffer.toString();
+    }
+
+    public static String getNonRememberPath(String path) {
+
+        if (validatePath(path)) {
+            return path;
+        }
+
+        StringBuffer buffer = new StringBuffer();
+        buffer.append(path.substring(0, path.indexOf(":", 4)+1));
+        String decryptedPassword = path.substring(path.indexOf(":", 4)+1, path.lastIndexOf("@"));
+
+        if (!TextUtils.isEmpty(decryptedPassword)) {
+
+            buffer.append(SMB_NO_PASSWORD);
+        }
+        buffer.append(path.substring(path.lastIndexOf("@"), path.length()));
+
+        return buffer.toString();
+    }
+
+    public static SMB_VERSION getSmbVersion(int smbVersion) {
+        switch (smbVersion) {
+            case 1:
+                return SMB_VERSION.V1;
+            case 2:
+                return SMB_VERSION.V2;
+            default:
+                return SMB_VERSION.V1;
+        }
+    }
+
+    /**
+     * Validates whether the smb path has any credentials or not
+     * @param path
+     * @return true if username and password is set in connection, false if connection is anon
+     */
+    private static boolean validatePath(String path) {
+        if (!(path.contains(":") && path.contains("@"))) {
+            return false;
+        } else {
+            return true;
+        }
     }
 }

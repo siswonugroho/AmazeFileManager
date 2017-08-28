@@ -24,6 +24,7 @@ import com.amaze.filemanager.activities.ThemedActivity;
 import com.amaze.filemanager.activities.MainActivity;
 import com.amaze.filemanager.adapters.RecyclerArrayAdapter;
 import com.amaze.filemanager.utils.Computer;
+import com.amaze.filemanager.utils.SmbUtil;
 import com.amaze.filemanager.utils.SubnetScanner;
 import com.amaze.filemanager.utils.color.ColorUsage;
 import com.amaze.filemanager.utils.provider.UtilitiesProviderInterface;
@@ -80,7 +81,7 @@ public class SmbSearchDialog extends DialogFragment {
                 if (getActivity() != null && getActivity() instanceof MainActivity) {
                     dismiss();
                     MainActivity mainActivity = (MainActivity) getActivity();
-                    mainActivity.showSMBDialog("", "", false);
+                    mainActivity.showSMBDialog("", "", SmbUtil.SMB_VERSION.V1, false);
                 }
             }
         });
@@ -113,7 +114,7 @@ public class SmbSearchDialog extends DialogFragment {
                                 dismiss();
                                 Toast.makeText(getActivity(), getResources().getString(R.string.nodevicefound), Toast.LENGTH_SHORT).show();
                                 MainActivity mainActivity = (MainActivity) getActivity();
-                                mainActivity.showSMBDialog("", "", false);
+                                mainActivity.showSMBDialog("", "", SmbUtil.SMB_VERSION.V1, false);
                                 return;
                             }
                             computers.remove(computers.size() - 1);
@@ -202,7 +203,8 @@ public class SmbSearchDialog extends DialogFragment {
                         if (getActivity() != null && getActivity() instanceof MainActivity) {
                             dismiss();
                             MainActivity mainActivity = (MainActivity) getActivity();
-                            mainActivity.showSMBDialog(listViewAdapter.getItem(p).name, listViewAdapter.getItem(p).addr, false);
+                            mainActivity.showSMBDialog(listViewAdapter.getItem(p).name,
+                                    listViewAdapter.getItem(p).addr, SmbUtil.SMB_VERSION.V1, false);
                         }
                     }
                 });

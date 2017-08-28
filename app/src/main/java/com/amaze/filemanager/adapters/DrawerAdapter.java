@@ -38,6 +38,7 @@ import com.amaze.filemanager.R;
 import com.amaze.filemanager.activities.MainActivity;
 import com.amaze.filemanager.activities.ThemedActivity;
 import com.amaze.filemanager.database.CloudHandler;
+import com.amaze.filemanager.database.models.SmbModel;
 import com.amaze.filemanager.filesystem.HFile;
 import com.amaze.filemanager.filesystem.Operations;
 import com.amaze.filemanager.filesystem.RootHelper;
@@ -46,6 +47,7 @@ import com.amaze.filemanager.ui.drawer.EntryItem;
 import com.amaze.filemanager.ui.drawer.Item;
 import com.amaze.filemanager.utils.DataUtils;
 import com.amaze.filemanager.utils.OpenMode;
+import com.amaze.filemanager.utils.SmbUtil;
 import com.amaze.filemanager.utils.Utils;
 import com.amaze.filemanager.utils.cloud.CloudUtil;
 import com.amaze.filemanager.utils.color.ColorUsage;
@@ -154,7 +156,13 @@ public class DrawerAdapter extends ArrayAdapter<Item> {
                             if (dataUtils.containsBooks(new String[]{item.getTitle(), path}) != -1) {
                                 m.renameBookmark((item).getTitle(), path);
                             } else if (path.startsWith("smb:/")) {
-                                m.showSMBDialog(item.getTitle(), path, true);
+                                SmbModel smbModel = dataUtils.getServer(title, path);
+
+                                SmbUtil.SMB_VERSION smb_version = null;
+                                if (smbModel != null) {
+                                     smb_version = smbModel.getSmbVersion();
+                                }
+                                m.showSMBDialog(title, path, smb_version, true);
                             } else if (path.startsWith(CloudHandler.CLOUD_PREFIX_DROPBOX)) {
 
                                 GeneralDialogCreation.showCloudDialog(m, utilsProvider.getAppTheme(), OpenMode.DROPBOX);

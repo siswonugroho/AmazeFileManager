@@ -9,6 +9,7 @@ import android.os.Environment;
 import android.widget.Toast;
 
 import com.amaze.filemanager.R;
+import com.amaze.filemanager.database.models.SmbModel;
 import com.amaze.filemanager.exceptions.CryptException;
 import com.amaze.filemanager.utils.SmbUtil;
 import com.amaze.filemanager.utils.files.CryptUtil;
@@ -144,8 +145,8 @@ public class UtilsHandler extends SQLiteOpenHelper {
         setPath(Operation.BOOKMARKS, name, path);
     }
 
-    public void addSmb(String name, String path) {
-        setPath(Operation.SMB, name, path);
+    public void addSmb(String name, String path, SmbUtil.SMB_VERSION smb_version) {
+        setPath(Operation.SMB, name, path, smb_version);
     }
 
     public ArrayList<String> getHistoryList() {
@@ -187,21 +188,25 @@ public class UtilsHandler extends SQLiteOpenHelper {
         return row;
     }
 
-    public ArrayList<String[]> getSmbList() {
+    /**
+     * Returns an array of string having first name
+     * @return
+     */
+    public ArrayList<SmbModel> getSmbList() {
         SQLiteDatabase sqLiteDatabase = getReadableDatabase();
 
         Cursor cursor = sqLiteDatabase.query(getTableForOperation(Operation.SMB), null,
                 null, null, null, null, null);
         cursor.moveToFirst();
-        ArrayList<String[]> row = new ArrayList<>();
+        ArrayList<SmbModel> row = new ArrayList<>();
         try {
 
             while (cursor.moveToNext()) {
                 try {
-                    row.add(new String[] {
-                            cursor.getString(cursor.getColumnIndex(COLUMN_NAME)),
-                            SmbUtil.getSmbDecryptedPath(context, cursor.getString(cursor.getColumnIndex(COLUMN_PATH)))
-                    });
+
+                    row.add(new SmbModel(cursor.getString(cursor.getColumnIndex(COLUMN_NAME)),
+                            SmbUtil.getSmbDecryptedPath(context, cursor.getString(cursor.getColumnIndex(COLUMN_PATH))),
+                            cursor.getInt(cursor.getColumnIndex(COLUMN_SMB_VERSION))));
                 } catch (CryptException e) {
                     e.printStackTrace();
 
@@ -299,8 +304,9 @@ public class UtilsHandler extends SQLiteOpenHelper {
         renamePath(Operation.BOOKMARKS, oldName, oldPath, newName, newPath);
     }
 
-    public void renameSMB(String oldName, String oldPath, String newName, String newPath) {
-        renamePath(Operation.SMB, oldName, oldPath, newName, newPath);
+    public void renameSMB(String oldName, String oldPath, String newName, String newPath,
+                          SmbUtil.SMB_VERSION smb_version) {
+        renamePath(Operation.SMB, oldName, oldPath, newName, newPath, smb_version);
     }
 
     private void setPath(Operation operation, String path) {
@@ -317,6 +323,16 @@ public class UtilsHandler extends SQLiteOpenHelper {
         contentValues.put(COLUMN_NAME, name);
         contentValues.put(COLUMN_PATH, path);
 
+        sqLiteDatabase.insert(getTableForOperation(operation), null, contentValues);
+    }
+
+    private void setPath(Operation operation, String name, String path, SmbUtil.SMB_VERSION smb_version) {
+
+        SQLiteDatabase sqLiteDatabase = getWritableDatabase();
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(COLUMN_NAME, name);
+        contentValues.put(COLUMN_PATH, path);
+        contentValues.put(COLUMN_SMB_VERSION, smb_version.getVersion());
         sqLiteDatabase.insert(getTableForOperation(operation), null, contentValues);
     }
 
@@ -374,7 +390,20 @@ public class UtilsHandler extends SQLiteOpenHelper {
     }
 
     private void renamePath(Operation operation, String oldName, String oldPath,
-                               String newName, String newPath) {
+                            String newName, String newPath, SmbUtil.SMB_VERSION smb_version) {
+        SQLiteDatabase sqLiteDatabase = getWritableDatabase();
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(COLUMN_NAME, newName);
+        contentValues.put(COLUMN_PATH, newPath);
+        contentValues.put(COLUMN_SMB_VERSION, smb_version.getVersion());
+
+        sqLiteDatabase.update(getTableForOperation(operation), contentValues, COLUMN_NAME
+                + "=? AND " + COLUMN_PATH + "=?", new String[] {oldName, oldPath});
+        return;
+    }
+
+    private void renamePath(Operation operation, String oldName, String oldPath,
+                            String newName, String newPath) {
         SQLiteDatabase sqLiteDatabase = getWritableDatabase();
         ContentValues contentValues = new ContentValues();
         contentValues.put(COLUMN_NAME, newName);

@@ -90,6 +90,7 @@ import com.amaze.filemanager.database.CryptHandler;
 import com.amaze.filemanager.database.TabHandler;
 import com.amaze.filemanager.database.UtilsHandler;
 import com.amaze.filemanager.database.models.CloudEntry;
+import com.amaze.filemanager.database.models.SmbModel;
 import com.amaze.filemanager.database.models.Tab;
 import com.amaze.filemanager.exceptions.CloudPluginException;
 import com.amaze.filemanager.filesystem.BaseFile;
@@ -1427,10 +1428,10 @@ public class MainActivity extends ThemedActivity implements
         sectionItems.add(new SectionItem());
 
         if (dataUtils.getServers().size() > 0) {
-            Collections.sort(dataUtils.getServers(), new BookSorter());
+            Collections.sort(dataUtils.getServerArray(), new BookSorter());
             synchronized (dataUtils.getServers()) {
-                for (String[] file : dataUtils.getServers()) {
-                    sectionItems.add(new EntryItem(file[0], file[1], ContextCompat.getDrawable(this,
+                for (SmbModel smbModel : dataUtils.getServers()) {
+                    sectionItems.add(new EntryItem(smbModel.getName(), smbModel.getPath(), ContextCompat.getDrawable(this,
                             R.drawable.ic_settings_remote_white_48dp)));
                 }
             }
@@ -2227,17 +2228,22 @@ public class MainActivity extends ThemedActivity implements
         }
     }
 
-    public void showSMBDialog(String name, String path, boolean edit) {
-        if (path.length() > 0 && name.length() == 0) {
-            int i = dataUtils.containsServer(new String[]{name, path});
+    public void showSMBDialog(String name, String path, SmbUtil.SMB_VERSION smb_version, boolean edit) {
+        /*if (path.length() > 0 && name.length() == 0) {
+            int i = dataUtils.containsServer(path);
             if (i != -1)
-                name = dataUtils.getServers().get(i)[0];
-        }
+                name = dataUtils.getServer(path).getName();
+        }*/
+
         SmbConnectDialog smbConnectDialog = new SmbConnectDialog();
         Bundle bundle = new Bundle();
-        bundle.putString("name", name);
-        bundle.putString("path", path);
-        bundle.putBoolean("edit", edit);
+        bundle.putString(SmbConnectDialog.KEY_NAME, name);
+        bundle.putString(SmbConnectDialog.KEY_PATH, path);
+        bundle.putBoolean(SmbConnectDialog.KEY_EDIT, edit);
+
+        if (smb_version != null)
+            bundle.putInt(SmbConnectDialog.KEY_SMB_VERSION, smb_version.getVersion());
+
         smbConnectDialog.setArguments(bundle);
         smbConnectDialog.show(getFragmentManager(), "smbdailog");
     }
@@ -2256,18 +2262,23 @@ public class MainActivity extends ThemedActivity implements
 
     @Override
     public void addSmbConnection(boolean edit, final String name, final String path, final String encryptedPath,
-                                 final String oldname, final String oldPath, SmbUtil.SMB_VERSION smbVersion) {
+                                 final String oldname, final String oldPath,
+                                 final SmbUtil.SMB_VERSION smbVersion, final boolean rememberPassword) {
 
         String[] s = new String[]{name, path};
+        SmbModel smbModel = new SmbModel(name, path, smbVersion);
+
         if (!edit) {
-            if ((dataUtils.containsServer(path)) == -1) {
-                dataUtils.addServer(s);
+            if ((dataUtils.containsServer(smbModel)) == -1) {
+
+                dataUtils.addServer(smbModel);
                 refreshDrawer();
 
                 AppConfig.runInBackground(new Runnable() {
                     @Override
                     public void run() {
-                        utilsHandler.addSmb(name, encryptedPath);
+                        utilsHandler.addSmb(name, rememberPassword ? encryptedPath
+                                : SmbUtil.getNonRememberPath(path), smbVersion);
                     }
                 });
 
@@ -2277,29 +2288,29 @@ public class MainActivity extends ThemedActivity implements
                 Snackbar.make(frameLayout, getResources().getString(R.string.connection_exists), Snackbar.LENGTH_SHORT).show();
             }
         } else {
-            int i = dataUtils.containsServer(new String[]{oldname, oldPath});
+            int i = dataUtils.containsServer(oldname, oldPath);
             if (i != -1) {
                 dataUtils.removeServer(i);
 
                 AppConfig.runInBackground(new Runnable() {
                     @Override
                     public void run() {
-                        utilsHandler.renameSMB(oldname, oldPath, name, path);
+                        utilsHandler.renameSMB(oldname, oldPath, name, rememberPassword ? path
+                                : SmbUtil.getNonRememberPath(path), smbVersion);
                     }
                 });
-                //mainActivity.grid.removePath(oldname, oldPath, DataUtils.SMB);
             }
-            dataUtils.addServer(s);
-            Collections.sort(dataUtils.getServers(), new BookSorter());
+            dataUtils.addServer(smbModel);
+
+            Collections.sort(dataUtils.getServerArray(), new BookSorter());
             mainActivity.refreshDrawer();
-            //mainActivity.grid.addPath(name, encryptedPath, DataUtils.SMB, 1);
         }
     }
 
     @Override
     public void deleteSmbConnection(final String name, final String path) {
 
-        int i = dataUtils.containsServer(new String[]{name, path});
+        int i = dataUtils.containsServer(name, path);
         if (i != -1) {
             dataUtils.removeServer(i);
 

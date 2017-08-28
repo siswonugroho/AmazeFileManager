@@ -104,16 +104,16 @@ public class CloudSheetFragment extends BottomSheetDialogFragment implements Vie
                 smbDialog.show(getActivity().getFragmentManager(), "tab");
                 return;
             case R.id.linear_layout_box:
-                ((MainActivity) getActivity()).addConnection(OpenMode.BOX);
+                ((MainActivity) getActivity()).addCloudConnection(OpenMode.BOX);
                 break;
             case R.id.linear_layout_dropbox:
-                ((MainActivity) getActivity()).addConnection(OpenMode.DROPBOX);
+                ((MainActivity) getActivity()).addCloudConnection(OpenMode.DROPBOX);
                 break;
             case R.id.linear_layout_google_drive:
-                ((MainActivity) getActivity()).addConnection(OpenMode.GDRIVE);
+                ((MainActivity) getActivity()).addCloudConnection(OpenMode.GDRIVE);
                 break;
             case R.id.linear_layout_onedrive:
-                ((MainActivity) getActivity()).addConnection(OpenMode.ONEDRIVE);
+                ((MainActivity) getActivity()).addCloudConnection(OpenMode.ONEDRIVE);
                 break;
             case R.id.linear_layout_get_cloud:
                 Intent cloudPluginIntent = new Intent(Intent.ACTION_VIEW);
