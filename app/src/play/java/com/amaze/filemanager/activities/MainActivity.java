@@ -114,6 +114,7 @@ import com.amaze.filemanager.services.asynctasks.MoveFiles;
 import com.amaze.filemanager.ui.dialogs.GeneralDialogCreation;
 import com.amaze.filemanager.ui.dialogs.RenameBookmark;
 import com.amaze.filemanager.ui.dialogs.RenameBookmark.BookmarkCallback;
+import com.amaze.filemanager.ui.dialogs.SmbAuthenticateDialog;
 import com.amaze.filemanager.ui.dialogs.SmbConnectDialog;
 import com.amaze.filemanager.ui.dialogs.SmbConnectDialog.SmbConnectionListener;
 import com.amaze.filemanager.ui.drawer.EntryItem;
@@ -872,6 +873,8 @@ public class MainActivity extends ThemedActivity implements
         ArrayList<Item> directoryItems = dataUtils.getList();
         if (!directoryItems.get(i).isSection()) {
             if ((selectedStorage == NO_VALUE || selectedStorage >= directoryItems.size())) {
+
+                // first time selecting an item in drawer list
                 TabFragment tabFragment = new TabFragment();
                 Bundle a = new Bundle();
                 a.putString("path", ((EntryItem) directoryItems.get(i)).getPath());
@@ -1236,6 +1239,7 @@ public class MainActivity extends ThemedActivity implements
         super.onPause();
         unregisterReceiver(mainActivityHelper.mNotificationReceiver);
         unregisterReceiver(receiver2);
+        unregisterReceiver(mSmbAuthenticationReceiver);
 
         if (SDK_INT >= Build.VERSION_CODES.KITKAT) {
             unregisterReceiver(mOtgReceiver);
@@ -1265,7 +1269,26 @@ public class MainActivity extends ThemedActivity implements
             otgFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
             registerReceiver(mOtgReceiver, otgFilter);
         }
+
+        registerReceiver(mSmbAuthenticationReceiver, new IntentFilter(SmbUtil.SMB_BROADCAST_PASSWORD));
     }
+
+    private BroadcastReceiver mSmbAuthenticationReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            SmbAuthenticateDialog smbAuthenticateDialog = new SmbAuthenticateDialog();
+            Bundle bundle = new Bundle();
+
+            // get the authentication details passed by drawer's {@link #selectItem}
+            String smbConnectionName = intent.getStringExtra(SmbAuthenticateDialog.SMB_NAME);
+            String smbConnectionPath = intent.getStringExtra(SmbAuthenticateDialog.SMB_PATH);
+            bundle.putString(SmbAuthenticateDialog.SMB_NAME, smbConnectionName);
+            bundle.putString(SmbAuthenticateDialog.SMB_PATH, smbConnectionPath);
+
+            smbAuthenticateDialog.setArguments(bundle);
+            smbAuthenticateDialog.show(getFragmentManager(), SmbAuthenticateDialog.TAG);
+        }
+    };
 
     /**
      * Receiver to check if a USB device is connected at the runtime of application
@@ -1273,7 +1296,7 @@ public class MainActivity extends ThemedActivity implements
      * then {@link #isUsbDeviceConnected()} method handles the connection through
      * {@link #getStorageDirectories()}
      */
-    BroadcastReceiver mOtgReceiver = new BroadcastReceiver() {
+    private BroadcastReceiver mOtgReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(UsbManager.ACTION_USB_DEVICE_ATTACHED)) {
@@ -2051,7 +2074,7 @@ public class MainActivity extends ThemedActivity implements
         }
     }
 
-    void onDrawerClosed() {
+    private void onDrawerClosed() {
         if (pending_fragmentTransaction != null) {
             pending_fragmentTransaction.commit();
             pending_fragmentTransaction = null;

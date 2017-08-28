@@ -18,6 +18,7 @@ public class SmbUtil {
     // it denotes no password is applied to the smb connection, this will not be encrypted
     // obvious security reasons
     public static final String SMB_NO_PASSWORD = "Zj#Zo2bqhyXZ3R7%";
+    public static final String SMB_BROADCAST_PASSWORD = "broadcast_smb_password";
 
     /**
      * Enum class denotes the supported smb versions and returns a compatible int value

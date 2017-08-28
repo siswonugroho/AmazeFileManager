@@ -199,28 +199,33 @@ public class UtilsHandler extends SQLiteOpenHelper {
                 null, null, null, null, null);
         cursor.moveToFirst();
         ArrayList<SmbModel> row = new ArrayList<>();
-        try {
+        while (cursor.moveToNext()) {
+            try {
 
-            while (cursor.moveToNext()) {
-                try {
+                SmbModel smbModel = new SmbModel();
+                smbModel.setName(cursor.getString(cursor.getColumnIndex(COLUMN_NAME)));
+                smbModel.setSmbVersion(cursor.getColumnIndex(COLUMN_SMB_VERSION));
 
-                    row.add(new SmbModel(cursor.getString(cursor.getColumnIndex(COLUMN_NAME)),
-                            SmbUtil.getSmbDecryptedPath(context, cursor.getString(cursor.getColumnIndex(COLUMN_PATH))),
-                            cursor.getInt(cursor.getColumnIndex(COLUMN_SMB_VERSION))));
-                } catch (CryptException e) {
-                    e.printStackTrace();
-
-                    // failing to decrypt the path, removing entry from database
-                    Toast.makeText(context,
-                            context.getResources().getString(R.string.failed_smb_decrypt_path),
-                            Toast.LENGTH_LONG).show();
-                    removeSmbPath(cursor.getString(cursor.getColumnIndex(COLUMN_NAME)),
-                            "");
-                    continue;
+                String dbPath = cursor.getString(cursor.getColumnIndex(COLUMN_PATH));
+                switch (dbPath) {
+                    case SmbUtil.SMB_NO_PASSWORD:
+                        smbModel.setPath(SmbUtil.getNonRememberPath(dbPath));
+                        break;
+                    default:
+                        smbModel.setPath(SmbUtil.getSmbDecryptedPath(context, dbPath));
+                        break;
                 }
+            } catch (CryptException e) {
+                e.printStackTrace();
+
+                // failing to decrypt the path, removing entry from database
+                Toast.makeText(context,
+                        context.getResources().getString(R.string.failed_smb_decrypt_path),
+                        Toast.LENGTH_LONG).show();
+                removeSmbPath(cursor.getString(cursor.getColumnIndex(COLUMN_NAME)),
+                        "");
+                continue;
             }
-        } finally {
-            cursor.close();
         }
         return row;
     }
