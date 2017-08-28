@@ -569,7 +569,7 @@ public class GeneralDialogCreation {
         builder.onPositive(new MaterialDialog.SingleButtonCallback() {
             @Override
             public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
-                mainActivity.deleteConnection(openMode);
+                mainActivity.deleteCloudConnection(openMode);
             }
         });
 

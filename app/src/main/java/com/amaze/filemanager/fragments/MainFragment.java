@@ -98,6 +98,7 @@ import com.amaze.filemanager.utils.MainActivityHelper;
 import com.amaze.filemanager.utils.OTGUtil;
 import com.amaze.filemanager.utils.OpenMode;
 import com.amaze.filemanager.utils.SmbStreamer.Streamer;
+import com.amaze.filemanager.utils.SmbUtil;
 import com.amaze.filemanager.utils.Utils;
 import com.amaze.filemanager.utils.cloud.CloudUtil;
 import com.amaze.filemanager.utils.color.ColorUsage;
@@ -1404,9 +1405,11 @@ public class MainFragment extends android.support.v4.app.Fragment {
                 getMainActivity().runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        int i;
-                        if ((i = dataUtils.containsServer(smbPath)) != -1) {
-                            getMainActivity().showSMBDialog(dataUtils.getServers().get(i)[0], smbPath, true);
+                        int i = dataUtils.contansServer(smbPath);
+                        String smbName = dataUtils.getServers().get(i).getName();
+                        SmbUtil.SMB_VERSION smb_version = dataUtils.getServers().get(i).getSmbVersion();
+                        if (i != -1) {
+                            getMainActivity().showSMBDialog(smbName, smbPath, smb_version, true);
                         }
                     }
                 });

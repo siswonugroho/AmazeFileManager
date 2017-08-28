@@ -225,8 +225,8 @@ public class CloudUtil {
                     // delete account and create a new one
                     Toast.makeText(mainActivity, mainActivity.getResources()
                             .getString(R.string.cloud_token_lost), Toast.LENGTH_LONG).show();
-                    mainActivity.deleteConnection(serviceType);
-                    mainActivity.addConnection(serviceType);
+                    mainActivity.deleteCloudConnection(serviceType);
+                    mainActivity.addCloudConnection(serviceType);
                 }
             }
         }.execute(path);

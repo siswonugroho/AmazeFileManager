@@ -75,7 +75,7 @@ public class UtilsHandler extends SQLiteOpenHelper {
         String querySmb = "CREATE TABLE IF NOT EXISTS " + TABLE_SMB + " ("
                 + COLUMN_ID + " INTEGER PRIMARY KEY,"
                 + COLUMN_NAME + " TEXT,"
-                + COLUMN_PATH + " TEXT"
+                + COLUMN_PATH + " TEXT,"
                 + COLUMN_SMB_VERSION + " INTEGER"
                 + ")";
 

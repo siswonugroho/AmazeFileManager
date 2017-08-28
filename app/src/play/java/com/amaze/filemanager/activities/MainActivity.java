@@ -2265,7 +2265,7 @@ public class MainActivity extends ThemedActivity implements
                                  final String oldname, final String oldPath,
                                  final SmbUtil.SMB_VERSION smbVersion, final boolean rememberPassword) {
 
-        String[] s = new String[]{name, path};
+        //String[] s = new String[]{name, path};
         SmbModel smbModel = new SmbModel(name, path, smbVersion);
 
         if (!edit) {

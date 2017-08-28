@@ -67,6 +67,20 @@ public class DataUtils {
         return -1;
     }
 
+    public int contansServer(String path) {
+        synchronized (servers) {
+
+            if (servers == null) return -1;
+            int i = -1;
+            for (SmbModel model : servers) {
+                i++;
+                if (model.getPath().equals(path)) return i;
+            }
+
+            return -1;
+        }
+    }
+
     public int containsBooks(String[] a) {
         return contains(a, books);
     }
@@ -358,7 +372,7 @@ public class DataUtils {
             };
             serversToStringArray.add(i, serverNameAndPath);
         }
-        return getServerArray();
+        return serversToStringArray;
     }
 
     public ArrayList<String> getHiddenfiles() {
