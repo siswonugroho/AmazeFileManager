@@ -14,6 +14,31 @@ import com.amaze.filemanager.utils.files.CryptUtil;
 
 public class SmbUtil {
 
+    // random string so that there is very low chance of it clashing with user set password
+    // it denotes no password is applied to the smb connection, this will not be encrypted
+    // obvious security reasons
+    public static final String SMB_NO_PASSWORD = "Zj#Zo2bqhyXZ3R7%";
+
+    /**
+     * Enum class denotes the supported smb versions and returns a compatible int value
+     * for the ease of persistence
+     */
+    public enum SMB_VERSION {
+
+        V1(1),
+        V2(2);
+
+        private int version;
+
+        SMB_VERSION(int i) {
+            this.version = i;
+        }
+
+        public int getVersion() {
+            return this.version;
+        }
+    }
+
     /**
      * Parse path to decrypt smb password
      * @return

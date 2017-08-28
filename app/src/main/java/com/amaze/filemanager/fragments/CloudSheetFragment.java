@@ -127,7 +127,7 @@ public class CloudSheetFragment extends BottomSheetDialogFragment implements Vie
     }
 
     public interface CloudConnectionCallbacks {
-        void addConnection(OpenMode service);
-        void deleteConnection(OpenMode service);
+        void addCloudConnection(OpenMode service);
+        void deleteCloudConnection(OpenMode service);
     }
 }

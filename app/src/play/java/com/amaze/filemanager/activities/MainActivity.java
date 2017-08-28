@@ -131,6 +131,7 @@ import com.amaze.filemanager.utils.OTGUtil;
 import com.amaze.filemanager.utils.OpenMode;
 import com.amaze.filemanager.utils.PreferenceUtils;
 import com.amaze.filemanager.utils.ServiceWatcherUtil;
+import com.amaze.filemanager.utils.SmbUtil;
 import com.amaze.filemanager.utils.TinyDB;
 import com.amaze.filemanager.utils.Utils;
 import com.amaze.filemanager.utils.color.ColorUsage;
@@ -2254,8 +2255,8 @@ public class MainActivity extends ThemedActivity implements
     }
 
     @Override
-    public void addConnection(boolean edit, final String name, final String path, final String encryptedPath,
-                              final String oldname, final String oldPath) {
+    public void addSmbConnection(boolean edit, final String name, final String path, final String encryptedPath,
+                                 final String oldname, final String oldPath, SmbUtil.SMB_VERSION smbVersion) {
 
         String[] s = new String[]{name, path};
         if (!edit) {
@@ -2269,7 +2270,7 @@ public class MainActivity extends ThemedActivity implements
                         utilsHandler.addSmb(name, encryptedPath);
                     }
                 });
-                //grid.addPath(name, encryptedPath, DataUtils.SMB, 1);
+
                 MainFragment ma = getCurrentMainFragment();
                 if (ma != null) getCurrentMainFragment().loadlist(path, false, OpenMode.UNKNOWN);
             } else {
@@ -2296,7 +2297,7 @@ public class MainActivity extends ThemedActivity implements
     }
 
     @Override
-    public void deleteConnection(final String name, final String path) {
+    public void deleteSmbConnection(final String name, final String path) {
 
         int i = dataUtils.containsServer(new String[]{name, path});
         if (i != -1) {
@@ -2363,30 +2364,32 @@ public class MainActivity extends ThemedActivity implements
 
     @Override
     public void onPreExecute(String query) {
-        mainFragment.mSwipeRefreshLayout.setRefreshing(true);
-        mainFragment.onSearchPreExecute(query);
+        getCurrentMainFragment().mSwipeRefreshLayout.setRefreshing(true);
+        getCurrentMainFragment().onSearchPreExecute(query);
     }
 
     @Override
     public void onPostExecute(String query) {
-        mainFragment.onSearchCompleted(query);
-        mainFragment.mSwipeRefreshLayout.setRefreshing(false);
+        getCurrentMainFragment().onSearchCompleted(query);
+        getCurrentMainFragment().mSwipeRefreshLayout.setRefreshing(false);
     }
 
     @Override
     public void onProgressUpdate(BaseFile val , String query) {
-        mainFragment.addSearchResult(val,query);
+        getCurrentMainFragment().addSearchResult(val,query);
     }
 
     @Override
     public void onCancelled() {
+
+        MainFragment mainFragment = getCurrentMainFragment();
         mainFragment.createViews(mainFragment.getLayoutElements(), false, mainFragment.getCurrentPath(),
                 mainFragment.openMode, false, !mainFragment.IS_LIST);
         mainFragment.mSwipeRefreshLayout.setRefreshing(false);
     }
 
     @Override
-    public void addConnection(OpenMode service) {
+    public void addCloudConnection(OpenMode service) {
 
         try {
             if (cloudHandler.findEntry(service) != null) {
@@ -2416,7 +2419,7 @@ public class MainActivity extends ThemedActivity implements
     }
 
     @Override
-    public void deleteConnection(OpenMode service) {
+    public void deleteCloudConnection(OpenMode service) {
 
         cloudHandler.clear(service);
         dataUtils.removeAccount(service);
@@ -2571,18 +2574,18 @@ public class MainActivity extends ThemedActivity implements
 
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.cloud_error_plugin));
-                                    deleteConnection(OpenMode.GDRIVE);
+                                    deleteCloudConnection(OpenMode.GDRIVE);
                                     return false;
                                 } catch (AuthenticationException e) {
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.cloud_fail_authenticate));
-                                    deleteConnection(OpenMode.GDRIVE);
+                                    deleteCloudConnection(OpenMode.GDRIVE);
                                     return false;
                                 } catch (Exception e) {
                                     // any other exception due to network conditions or other error
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.failed_cloud_new_connection));
-                                    deleteConnection(OpenMode.GDRIVE);
+                                    deleteCloudConnection(OpenMode.GDRIVE);
                                     return false;
                                 }
                                 break;
@@ -2621,18 +2624,18 @@ public class MainActivity extends ThemedActivity implements
                                 } catch (CloudPluginException e) {
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.cloud_error_plugin));
-                                    deleteConnection(OpenMode.DROPBOX);
+                                    deleteCloudConnection(OpenMode.DROPBOX);
                                     return false;
                                 } catch (AuthenticationException e) {
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.cloud_fail_authenticate));
-                                    deleteConnection(OpenMode.DROPBOX);
+                                    deleteCloudConnection(OpenMode.DROPBOX);
                                     return false;
                                 } catch (Exception e) {
                                     // any other exception due to network conditions or other error
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.failed_cloud_new_connection));
-                                    deleteConnection(OpenMode.DROPBOX);
+                                    deleteCloudConnection(OpenMode.DROPBOX);
                                     return false;
                                 }
                                 break;
@@ -2672,18 +2675,18 @@ public class MainActivity extends ThemedActivity implements
 
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.cloud_error_plugin));
-                                    deleteConnection(OpenMode.BOX);
+                                    deleteCloudConnection(OpenMode.BOX);
                                     return false;
                                 } catch (AuthenticationException e) {
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.cloud_fail_authenticate));
-                                    deleteConnection(OpenMode.BOX);
+                                    deleteCloudConnection(OpenMode.BOX);
                                     return false;
                                 } catch (Exception e) {
                                     // any other exception due to network conditions or other error
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.failed_cloud_new_connection));
-                                    deleteConnection(OpenMode.BOX);
+                                    deleteCloudConnection(OpenMode.BOX);
                                     return false;
                                 }
                                 break;
@@ -2723,18 +2726,18 @@ public class MainActivity extends ThemedActivity implements
 
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.cloud_error_plugin));
-                                    deleteConnection(OpenMode.ONEDRIVE);
+                                    deleteCloudConnection(OpenMode.ONEDRIVE);
                                     return false;
                                 } catch (AuthenticationException e) {
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.cloud_fail_authenticate));
-                                    deleteConnection(OpenMode.ONEDRIVE);
+                                    deleteCloudConnection(OpenMode.ONEDRIVE);
                                     return false;
                                 } catch (Exception e) {
                                     // any other exception due to network conditions or other error
                                     e.printStackTrace();
                                     AppConfig.toast(MainActivity.this, getResources().getString(R.string.failed_cloud_new_connection));
-                                    deleteConnection(OpenMode.ONEDRIVE);
+                                    deleteCloudConnection(OpenMode.ONEDRIVE);
                                     return false;
                                 }
                                 break;

@@ -16,6 +16,7 @@ import android.support.v7.widget.AppCompatEditText;
 import android.support.v7.widget.AppCompatSpinner;
 import android.text.Editable;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.SimpleAdapter;
@@ -65,8 +66,8 @@ public class SmbConnectDialog extends DialogFragment {
          * @param oldPath the old full path (un-encrypted as we read from existing entry in db, which
          *                we decrypted beforehand).
          */
-        void addConnection(boolean edit, String name, String path, String encryptedPath,
-                           String oldname, String oldPath);
+        void addSmbConnection(boolean edit, String name, String path, String encryptedPath,
+                           String oldname, String oldPath, SmbUtil.SMB_VERSION smbVersion);
 
         /**
          * Callback denoting a connection been deleted from dialog
@@ -79,7 +80,7 @@ public class SmbConnectDialog extends DialogFragment {
          *             on the name only. But that is not supported as of now.
          *             See {@link com.amaze.filemanager.database.UtilsHandler#removeSmbPath(String, String)}
          */
-        void deleteConnection(String name, String path);
+        void deleteSmbConnection(String name, String path);
     }
 
     private Context context;
@@ -90,6 +91,7 @@ public class SmbConnectDialog extends DialogFragment {
     private AppCompatSpinner smbSpinner;
     private AppCompatCheckBox rememberPasswordCheckBox, anonymousCheckBox;
     private View rootView;
+    private SmbUtil.SMB_VERSION smbVersion;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -100,9 +102,9 @@ public class SmbConnectDialog extends DialogFragment {
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
 
-        final boolean edit=getArguments().getBoolean("edit",false);
-        final String path=getArguments().getString("path");
-        final String name=getArguments().getString("name");
+        final boolean edit = getArguments().getBoolean("edit",false);
+        final String path = getArguments().getString("path");
+        final String name = getArguments().getString("name");
         context=getActivity();
         emptyAddress = String.format(getString(R.string.cantbeempty),getString(R.string.ip) );
         emptyName = String.format(getString(R.string.cantbeempty),getString(R.string.connectionname) );
@@ -128,6 +130,28 @@ public class SmbConnectDialog extends DialogFragment {
                 R.array.smb_versions, android.R.layout.simple_spinner_item);
         smbVersionsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         smbSpinner.setAdapter(smbVersionsAdapter);
+
+        smbSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                switch (position) {
+                    case 0:
+                        smbVersion = SmbUtil.SMB_VERSION.V1;
+                        break;
+                    case 1:
+                        smbVersion = SmbUtil.SMB_VERSION.V2;
+                        break;
+                    default:
+                        smbVersion = SmbUtil.SMB_VERSION.V1;
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+                // empty
+            }
+        });
 
         conName.addTextChangedListener(new SimpleTextWatcher() {
             @Override
@@ -181,6 +205,8 @@ public class SmbConnectDialog extends DialogFragment {
         EditTextColorStateUtil.setTint(context, pass, accentColor);
 
         Utils.setTint(context, anonymousCheckBox, accentColor);
+        Utils.setTint(context, rememberPasswordCheckBox, accentColor);
+
         help.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -248,41 +274,45 @@ public class SmbConnectDialog extends DialogFragment {
         ba3.onPositive(new MaterialDialog.SingleButtonCallback() {
             @Override
             public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
+
                 String s[];
                 String ipa = ip.getText().toString();
                 String con_nam=conName.getText().toString();
                 String sDomain = domain.getText().toString();
                 String username = user.getText().toString();
                 TextInputLayout firstInvalidField  = null;
-                if(con_nam==null || con_nam.length()==0){
+
+                if(con_nam==null || con_nam.length()==0) {
                     connectionTIL.setError(emptyName);
                     firstInvalidField = connectionTIL;
                 }
-                if(ipa==null || ipa.length()==0){
+
+                if(ipa==null || ipa.length()==0) {
                     ipTIL.setError(emptyAddress);
                     if(firstInvalidField == null)
                         firstInvalidField = ipTIL;
                 }
-                if(sDomain.contains(";"))
-                {
+
+                if(sDomain.contains(";")) {
                     domainTIL.setError(invalidDomain);
                     if(firstInvalidField == null)
                         firstInvalidField = domainTIL;
                 }
-                if(username.contains(":"))
-                {
+
+                if(username.contains(":")) {
                     usernameTIL.setError(invalidUsername);
                     if(firstInvalidField == null)
                         firstInvalidField = usernameTIL;
                 }
-                if(firstInvalidField != null)
-                {
+
+                if(firstInvalidField != null) {
                     firstInvalidField.requestFocus();
                     return;
                 }
+
                 SmbFile smbFile;
                 String domaind = domain.getText().toString();
-                if (rememberPasswordCheckBox.isChecked())
+                if (anonymousCheckBox.isChecked())
                     smbFile = createSMBPath(new String[]{ipa, "", "",domaind}, true);
                 else {
                     String useraw = user.getText().toString();
@@ -303,9 +333,10 @@ public class SmbConnectDialog extends DialogFragment {
                     return;
                 }
 
-                if(smbConnectionListener!=null) {
+                if(smbConnectionListener != null) {
                     // encrypted path means path with encrypted pass
-                    smbConnectionListener.addConnection(edit, s[0], smbFile.getPath(), s[1], name, path);
+                    smbConnectionListener.addSmbConnection(edit, s[0], smbFile.getPath(), s[1],
+                            name, path, smbVersion);
                 }
                 dismiss();
             }
@@ -315,7 +346,7 @@ public class SmbConnectDialog extends DialogFragment {
             public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
 
                 if(smbConnectionListener!=null){
-                    smbConnectionListener.deleteConnection(name, path);
+                    smbConnectionListener.deleteSmbConnection(name, path);
                 }
 
                 dismiss();

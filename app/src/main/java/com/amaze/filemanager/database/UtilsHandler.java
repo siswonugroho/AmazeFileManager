@@ -29,7 +29,7 @@ public class UtilsHandler extends SQLiteOpenHelper {
     private Context context;
 
     private static final String DATABASE_NAME = "utilities.db";
-    private static final int DATABASE_VERSION = 1;  // increment only when making change in schema
+    private static final int DATABASE_VERSION = 2;  // increment only when making change in schema
 
     private static final String TABLE_HISTORY = "history";
     private static final String TABLE_HIDDEN = "hidden";
@@ -41,6 +41,7 @@ public class UtilsHandler extends SQLiteOpenHelper {
     private static final String COLUMN_ID = "_id";
     private static final String COLUMN_PATH = "path";
     private static final String COLUMN_NAME = "name";
+    private static final String COLUMN_SMB_VERSION = "version";
 
     public UtilsHandler(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -74,6 +75,7 @@ public class UtilsHandler extends SQLiteOpenHelper {
                 + COLUMN_ID + " INTEGER PRIMARY KEY,"
                 + COLUMN_NAME + " TEXT,"
                 + COLUMN_PATH + " TEXT"
+                + COLUMN_SMB_VERSION + " INTEGER"
                 + ")";
 
         db.execSQL(queryHistory);
