@@ -54,12 +54,6 @@ import jcifs.smb.SmbFile;
  * Created by Arpit on 04-06-2015.
  */
 public abstract class FileUtil {
-    /**
-     * Determine the camera folder. There seems to be no Android API to work for real devices, so this is a best guess.
-     *
-     * @return the default camera folder.
-     **/
-    //TODO the function?
 
     /**
      * Copy a file. The target file may even be on external SD card for Kitkat.

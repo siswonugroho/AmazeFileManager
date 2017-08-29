@@ -20,6 +20,8 @@ public class SmbUtil {
     public static final String SMB_NO_PASSWORD = "Zj#Zo2bqhyXZ3R7%";
     public static final String SMB_BROADCAST_PASSWORD = "broadcast_smb_password";
 
+    private static final String SMB_HEADER = "smb://";
+
     /**
      * Enum class denotes the supported smb versions and returns a compatible int value
      * for the ease of persistence
@@ -97,7 +99,7 @@ public class SmbUtil {
 
     public static String getNonRememberPath(String path) {
 
-        if (validatePath(path)) {
+        if (!validatePath(path)) {
             return path;
         }
 
@@ -123,6 +125,27 @@ public class SmbUtil {
             default:
                 return SMB_VERSION.V1;
         }
+    }
+
+    public static String getSmbUsername(String path) {
+
+        if (!validatePath(path)) {
+            // no credentials, hence no username
+            return "";
+        }
+
+        String pathWithoutHeader = path.replace(SMB_HEADER, "");
+
+        StringBuilder stringBuilder = new StringBuilder(pathWithoutHeader);
+        stringBuilder.substring(0, pathWithoutHeader.indexOf(":"));
+        return stringBuilder.toString();
+    }
+
+    public static String getSmbIpAddress(String path) {
+
+        StringBuilder stringBuilder = new StringBuilder(path);
+        stringBuilder.substring(path.lastIndexOf("@" +1), path.length()-1);
+        return stringBuilder.toString();
     }
 
     /**

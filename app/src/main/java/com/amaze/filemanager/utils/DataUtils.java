@@ -436,6 +436,7 @@ public class DataUtils {
      * The callbacks are called in a background thread
      */
     public interface DataChangeListener {
+
         void onHiddenFileAdded(String path);
 
         void onHiddenFileRemoved(String path);

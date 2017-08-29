@@ -1282,8 +1282,10 @@ public class MainActivity extends ThemedActivity implements
             // get the authentication details passed by drawer's {@link #selectItem}
             String smbConnectionName = intent.getStringExtra(SmbAuthenticateDialog.SMB_NAME);
             String smbConnectionPath = intent.getStringExtra(SmbAuthenticateDialog.SMB_PATH);
+            int smbVersion = intent.getIntExtra(SmbAuthenticateDialog.SMB_VERSION, 1);
             bundle.putString(SmbAuthenticateDialog.SMB_NAME, smbConnectionName);
             bundle.putString(SmbAuthenticateDialog.SMB_PATH, smbConnectionPath);
+            bundle.putInt(SmbAuthenticateDialog.SMB_VERSION, smbVersion);
 
             smbAuthenticateDialog.setArguments(bundle);
             smbAuthenticateDialog.show(getFragmentManager(), SmbAuthenticateDialog.TAG);
