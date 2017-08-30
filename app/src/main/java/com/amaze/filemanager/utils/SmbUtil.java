@@ -17,8 +17,9 @@ public class SmbUtil {
     // random string so that there is very low chance of it clashing with user set password
     // it denotes no password is applied to the smb connection, this will not be encrypted
     // obvious security reasons
-    public static final String SMB_NO_PASSWORD = "Zj#Zo2bqhyXZ3R7%";
+    public static final String SMB_NO_PASSWORD = "A/4lBCUw+zxVvAyZESDMNB4CfcRgQWSWfzzZSV+nOn+v+LUalzaVg==";
     public static final String SMB_BROADCAST_PASSWORD = "broadcast_smb_password";
+    public static final String PREFIX_SMB = "smb:/";
 
     private static final String SMB_HEADER = "smb://";
 
@@ -97,6 +98,12 @@ public class SmbUtil {
         return buffer.toString();
     }
 
+    /**
+     * Returns an smb path with added {@link #SMB_NO_PASSWORD} instead of the original password
+     * This path is then saved to database, as the user chose not the remember the password
+     * @param path
+     * @return
+     */
     public static String getNonRememberPath(String path) {
 
         if (!validatePath(path)) {
@@ -146,6 +153,27 @@ public class SmbUtil {
         StringBuilder stringBuilder = new StringBuilder(path);
         stringBuilder.substring(path.lastIndexOf("@" +1), path.length()-1);
         return stringBuilder.toString();
+    }
+
+    /**
+     * Returns the password of smb path, regardless of whether it's encrypted or not
+     * @param path
+     * @return
+     */
+    public static String getSmbPassword(String path) {
+
+        return path.substring(path.indexOf(":", 4)+1, path.lastIndexOf("@"));
+    }
+
+    /**
+     * Builds an smb path by replacing the {@link #SMB_NO_PASSWORD} with user entered one
+     * @param oldPath
+     * @param password
+     * @return
+     */
+    public static String buildSmbPath(String oldPath, String password) {
+
+        return oldPath.replace(SMB_NO_PASSWORD, password);
     }
 
     /**

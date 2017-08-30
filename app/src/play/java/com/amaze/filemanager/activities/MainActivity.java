@@ -174,7 +174,7 @@ public class MainActivity extends ThemedActivity implements
         GoogleApiClient.OnConnectionFailedListener, OnRequestPermissionsResultCallback,
         SmbConnectionListener, DataChangeListener, BookmarkCallback,
         SearchWorkerFragment.HelperCallbacks, CloudConnectionCallbacks,
-        LoaderManager.LoaderCallbacks<Cursor> {
+        LoaderManager.LoaderCallbacks<Cursor>, SmbAuthenticateDialog.SmbAuthenticationCallbacks {
 
     public static final Pattern DIR_SEPARATOR = Pattern.compile("/");
     public static final String TAG_ASYNC_HELPER = "async_helper";
@@ -893,9 +893,26 @@ public class MainActivity extends ThemedActivity implements
                 floatingActionButton.setVisibility(View.VISIBLE);
                 floatingActionButton.showMenuButton(true);
             } else {
-                pendingPath = ((EntryItem) directoryItems.get(i)).getPath();
 
                 selectedStorage = i;
+
+                EntryItem entryItem = (EntryItem) directoryItems.get(i);
+                if (entryItem.getPath().startsWith(SmbUtil.PREFIX_SMB)) {
+                    // smb entry pressed, let's check if we have the password or not
+
+                    if (SmbUtil.getSmbPassword(entryItem.getPath()).equals(SmbUtil.SMB_NO_PASSWORD)) {
+                        // password match the non remember password from the database entry, let's ask user
+                        // to enter the real password
+                        Intent intent = new Intent(SmbUtil.SMB_BROADCAST_PASSWORD);
+
+                        intent.putExtra(SmbAuthenticateDialog.SMB_PATH, entryItem.getPath());
+                        sendBroadcast(intent);
+                        return;
+                    }
+                }
+
+                pendingPath = ((EntryItem) directoryItems.get(i)).getPath();
+
                 adapter.toggleChecked(selectedStorage);
 
                 if (((EntryItem) directoryItems.get(i)).getPath().contains(OTGUtil.PREFIX_OTG) &&
@@ -1274,18 +1291,15 @@ public class MainActivity extends ThemedActivity implements
     }
 
     private BroadcastReceiver mSmbAuthenticationReceiver = new BroadcastReceiver() {
+
         @Override
         public void onReceive(Context context, Intent intent) {
             SmbAuthenticateDialog smbAuthenticateDialog = new SmbAuthenticateDialog();
             Bundle bundle = new Bundle();
 
             // get the authentication details passed by drawer's {@link #selectItem}
-            String smbConnectionName = intent.getStringExtra(SmbAuthenticateDialog.SMB_NAME);
             String smbConnectionPath = intent.getStringExtra(SmbAuthenticateDialog.SMB_PATH);
-            int smbVersion = intent.getIntExtra(SmbAuthenticateDialog.SMB_VERSION, 1);
-            bundle.putString(SmbAuthenticateDialog.SMB_NAME, smbConnectionName);
             bundle.putString(SmbAuthenticateDialog.SMB_PATH, smbConnectionPath);
-            bundle.putInt(SmbAuthenticateDialog.SMB_VERSION, smbVersion);
 
             smbAuthenticateDialog.setArguments(bundle);
             smbAuthenticateDialog.show(getFragmentManager(), SmbAuthenticateDialog.TAG);
@@ -2799,5 +2813,61 @@ public class MainActivity extends ThemedActivity implements
 
     @Override
     public void onLoaderReset(Loader<Cursor> loader) {
+    }
+
+    @Override
+    public void authenticateSmb(String path, boolean rememberPassword) {
+
+        // continue with drawer close after setting the pending path
+        pendingPath = path;
+
+        adapter.toggleChecked(selectedStorage);
+
+        if (rememberPassword) {
+            // user chose to remember the password, let's replace the old entry in database with this one
+
+            int index = 0;
+            SmbModel newSmbModel = null;
+            SmbModel oldSmbModel = null;
+            for (SmbModel smbModel : dataUtils.getServers()) {
+
+                index++;
+
+                // let's match connection name and ip address to find the correct object,
+                // as this path includes a separate password than the one saved in database
+                String connectionName = smbModel.getName();
+                String connectionPath = smbModel.getPath();
+                if (connectionName.equals(SmbUtil.getSmbUsername(path)) &&
+                        SmbUtil.getSmbIpAddress(connectionPath).equals(SmbUtil.getSmbIpAddress(path))) {
+                    dataUtils.removeServer(index);
+                    oldSmbModel = smbModel;
+                    newSmbModel = new SmbModel(connectionName, path, smbModel.getSmbVersion());
+                }
+            }
+
+            final SmbModel finalNewSmbModel = newSmbModel;
+            final SmbModel finalOldSmbModel = oldSmbModel;
+            AppConfig.runInBackground(new Runnable() {
+                @Override
+                public void run() {
+
+                    if (finalNewSmbModel != null && finalOldSmbModel != null)
+                    utilsHandler.renameSMB(finalOldSmbModel.getName(), finalOldSmbModel.getPath(),
+                            finalNewSmbModel.getName(), finalNewSmbModel.getPath(), finalOldSmbModel.getSmbVersion());
+                }
+            });
+        }
+        if (!isDrawerLocked) mDrawerLayout.closeDrawer(mDrawerLinear);
+        else onDrawerClosed();
+    }
+
+    @Override
+    public void cancelSmbAuthentication() {
+
+        // remove the pending path and close drawer
+        pendingPath = null;
+
+        if (!isDrawerLocked) mDrawerLayout.closeDrawer(mDrawerLinear);
+        else onDrawerClosed();
     }
 }
