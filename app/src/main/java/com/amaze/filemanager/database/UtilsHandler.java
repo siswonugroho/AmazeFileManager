@@ -207,7 +207,9 @@ public class UtilsHandler extends SQLiteOpenHelper {
                 smbModel.setSmbVersion(cursor.getColumnIndex(COLUMN_SMB_VERSION));
 
                 String dbPath = cursor.getString(cursor.getColumnIndex(COLUMN_PATH));
-                switch (dbPath) {
+                String password = SmbUtil.getSmbPassword(dbPath);
+
+                switch (password) {
                     case SmbUtil.SMB_NO_PASSWORD:
                         smbModel.setPath(SmbUtil.getNonRememberPath(dbPath));
                         break;

@@ -462,7 +462,6 @@ public class MainActivity extends ThemedActivity implements
         }
 
 
-
         if (!sharedPref.getBoolean(KEY_PREFERENCE_BOOKMARKS_ADDED, false)) {
             utilsHandler.addCommonBookmarks();
             sharedPref.edit().putBoolean(KEY_PREFERENCE_BOOKMARKS_ADDED, true).commit();
