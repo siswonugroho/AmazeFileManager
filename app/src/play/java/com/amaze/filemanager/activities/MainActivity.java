@@ -85,6 +85,10 @@ import com.afollestad.materialdialogs.MaterialDialog;
 import com.amaze.filemanager.R;
 import com.amaze.filemanager.activities.superclasses.ThemedActivity;
 import com.amaze.filemanager.adapters.DrawerAdapter;
+import com.amaze.filemanager.asynchronous.asynctasks.DeleteTask;
+import com.amaze.filemanager.asynchronous.asynctasks.MoveFiles;
+import com.amaze.filemanager.asynchronous.asynctasks.PrepareCopyTask;
+import com.amaze.filemanager.asynchronous.services.CopyService;
 import com.amaze.filemanager.database.CloudContract;
 import com.amaze.filemanager.database.CloudHandler;
 import com.amaze.filemanager.database.CryptHandler;
@@ -93,9 +97,10 @@ import com.amaze.filemanager.database.UtilsHandler;
 import com.amaze.filemanager.database.models.CloudEntry;
 import com.amaze.filemanager.database.models.Tab;
 import com.amaze.filemanager.exceptions.CloudPluginException;
-import com.amaze.filemanager.filesystem.HybridFileParcelable;
 import com.amaze.filemanager.filesystem.FileUtil;
 import com.amaze.filemanager.filesystem.HybridFile;
+import com.amaze.filemanager.filesystem.HybridFileParcelable;
+import com.amaze.filemanager.filesystem.PasteHelper;
 import com.amaze.filemanager.filesystem.RootHelper;
 import com.amaze.filemanager.fragments.AppsListFragment;
 import com.amaze.filemanager.fragments.CloudSheetFragment;
@@ -106,11 +111,8 @@ import com.amaze.filemanager.fragments.ProcessViewerFragment;
 import com.amaze.filemanager.fragments.SearchWorkerFragment;
 import com.amaze.filemanager.fragments.TabFragment;
 import com.amaze.filemanager.fragments.ZipExplorerFragment;
+import com.amaze.filemanager.fragments.preference_fragments.PrefFrag;
 import com.amaze.filemanager.fragments.preference_fragments.QuickAccessPref;
-import com.amaze.filemanager.asynchronous.services.CopyService;
-import com.amaze.filemanager.asynchronous.asynctasks.DeleteTask;
-import com.amaze.filemanager.asynchronous.asynctasks.PrepareCopyTask;
-import com.amaze.filemanager.asynchronous.asynctasks.MoveFiles;
 import com.amaze.filemanager.ui.dialogs.GeneralDialogCreation;
 import com.amaze.filemanager.ui.dialogs.RenameBookmark;
 import com.amaze.filemanager.ui.dialogs.RenameBookmark.BookmarkCallback;
@@ -123,7 +125,6 @@ import com.amaze.filemanager.ui.views.RoundedImageView;
 import com.amaze.filemanager.ui.views.ScrimInsetsRelativeLayout;
 import com.amaze.filemanager.ui.views.appbar.AppBar;
 import com.amaze.filemanager.ui.views.appbar.SearchView;
-import com.amaze.filemanager.utils.application.AppConfig;
 import com.amaze.filemanager.utils.BookSorter;
 import com.amaze.filemanager.utils.DataUtils;
 import com.amaze.filemanager.utils.DataUtils.DataChangeListener;
@@ -134,6 +135,7 @@ import com.amaze.filemanager.utils.PreferenceUtils;
 import com.amaze.filemanager.utils.ServiceWatcherUtil;
 import com.amaze.filemanager.utils.TinyDB;
 import com.amaze.filemanager.utils.Utils;
+import com.amaze.filemanager.utils.application.AppConfig;
 import com.amaze.filemanager.utils.color.ColorUsage;
 import com.amaze.filemanager.utils.files.FileUtils;
 import com.amaze.filemanager.utils.theme.AppTheme;
@@ -157,6 +159,7 @@ import com.readystatesoftware.systembartint.SystemBarTintManager;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -186,7 +189,6 @@ public class MainActivity extends ThemedActivity implements
     public ListView mDrawerList;
     public ScrimInsetsRelativeLayout mDrawerLinear;
     public String path = "", launchPath;
-    public ArrayList<HybridFileParcelable> COPY_PATH = null, MOVE_PATH = null;
     public FrameLayout frameLayout;
     public boolean mReturnIntent = false;
     public boolean useGridView, openzip = false;
@@ -220,6 +222,8 @@ public class MainActivity extends ThemedActivity implements
     public MainFragment mainFragment;
 
     public static final String KEY_PREF_OTG = "uri_usb_otg";
+
+    public static final String PASTEHELPER_BUNDLE = "pasteHelper";
 
     private static final int image_selector_request_code = 31;
 
@@ -273,6 +277,25 @@ public class MainActivity extends ThemedActivity implements
     public static final String TAG_INTENT_FILTER_GENERAL = "general_communications";
     public static final String ARGS_KEY_LOADER = "loader_cloud_args_service";
 
+    /**
+     * Broadcast which will be fired after every file operation, will denote list loading
+     * Registered by {@link MainFragment}
+     */
+    public static final String KEY_INTENT_LOAD_LIST = "loadlist";
+
+    /**
+     * Extras carried by the list loading intent
+     * Contains path of parent directory in which operation took place, so that we can run
+     * media scanner on it
+     */
+    public static final String KEY_INTENT_LOAD_LIST_FILE = "loadlist_file";
+
+    /**
+     * Mime type in intent that apps need to pass when trying to open file manager from a specific directory
+     * Should be clubbed with {@link Intent#ACTION_VIEW} and send in path to open in intent data field
+     */
+    public static final String ARGS_INTENT_ACTION_VIEW_MIME_FOLDER = "resource/folder";
+
     private static final String CLOUD_AUTHENTICATOR_GDRIVE = "android.intent.category.BROWSABLE";
     private static final String CLOUD_AUTHENTICATOR_REDIRECT_URI = "com.amaze.filemanager:/oauth2redirect";
 
@@ -288,6 +311,8 @@ public class MainActivity extends ThemedActivity implements
     private static final int REQUEST_CODE_CLOUD_LIST_KEY = 5472;
 
     private static final String KEY_PREFERENCE_BOOKMARKS_ADDED = "books_added";
+
+    private PasteHelper pasteHelper;
 
     /**
      * Called when the activity is first created.
@@ -368,8 +393,25 @@ public class MainActivity extends ThemedActivity implements
 
                 // zip viewer intent
                 Uri uri = intent.getData();
-                openzip = true;
-                zippath = uri.toString();
+                String type = intent.getType();
+
+                if (type != null && type.equals(ARGS_INTENT_ACTION_VIEW_MIME_FOLDER)) {
+                    // support for syncting or intents from external apps that
+                    // need to start file manager from a specific path
+
+                    if (uri != null) {
+
+                        path = uri.getPath();
+                    } else {
+                        // no data field, open home for the tab in later processing
+                        path = null;
+                    }
+                } else {
+                    // we don't have folder resource mime type set, supposed to be zip/rar
+                    openzip = true;
+                    zippath = uri.toString();
+                }
+
             } else if (actionIntent.equals(Intent.ACTION_SEND) && typeIntent != null) {
                 // save a single file to filesystem
 
@@ -520,8 +562,7 @@ public class MainActivity extends ThemedActivity implements
                         }
                     }
                 } else {
-                    COPY_PATH = savedInstanceState.getParcelableArrayList("COPY_PATH");
-                    MOVE_PATH = savedInstanceState.getParcelableArrayList("MOVE_PATH");
+                    pasteHelper = savedInstanceState.getParcelable(PASTEHELPER_BUNDLE);
                     oppathe = savedInstanceState.getString("oppathe");
                     oppathe1 = savedInstanceState.getString("oppathe1");
                     oparrayList = savedInstanceState.getParcelableArrayList("oparrayList");
@@ -780,7 +821,7 @@ public class MainActivity extends ThemedActivity implements
     }
 
     public void invalidatePasteButton(MenuItem paste) {
-        if (MOVE_PATH != null || COPY_PATH != null) {
+        if (pasteHelper != null) {
             paste.setVisible(true);
         } else {
             paste.setVisible(false);
@@ -952,7 +993,7 @@ public class MainActivity extends ThemedActivity implements
         MenuItem paste = menu.findItem(R.id.paste);
         Fragment fragment = getFragmentAtFrame();
         if (fragment instanceof TabFragment) {
-            appbar.setTitle("Amaze");
+            appbar.setTitle(R.string.appbar_name);
             if (useGridView) {
                 s.setTitle(getResources().getString(R.string.gridview));
             } else {
@@ -1002,6 +1043,7 @@ public class MainActivity extends ThemedActivity implements
             menu.findItem(R.id.view).setVisible(false);
             menu.findItem(R.id.paste).setVisible(false);
         } else if (fragment instanceof ZipExplorerFragment) {
+            appbar.setTitle(R.string.appbar_name);
             menu.findItem(R.id.sethome).setVisible(false);
             if (indicator_layout != null) indicator_layout.setVisibility(View.GONE);
             getAppbar().getBottomBar().resetClickListener();
@@ -1165,18 +1207,17 @@ public class MainActivity extends ThemedActivity implements
                 break;
             case R.id.paste:
                 String path = ma.getCurrentPath();
-                ArrayList<HybridFileParcelable> arrayList = COPY_PATH != null? COPY_PATH:MOVE_PATH;
-                boolean move = MOVE_PATH != null;
+                ArrayList<HybridFileParcelable> arrayList = new ArrayList<>(Arrays.asList(pasteHelper.paths));
+                boolean move = pasteHelper.operation == PasteHelper.OPERATION_CUT;
                 new PrepareCopyTask(ma, path, move, mainActivity, ThemedActivity.rootMode)
                         .executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, arrayList);
-                COPY_PATH = null;
-                MOVE_PATH = null;
+                pasteHelper = null;
                 invalidatePasteButton(item);
                 break;
             case R.id.extract:
                 Fragment fragment1 = getFragmentAtFrame();
                 if (fragment1 instanceof ZipExplorerFragment) {
-                    mainActivityHelper.extractFile(((ZipExplorerFragment) fragment1).f);
+                    mainActivityHelper.extractFile(((ZipExplorerFragment) fragment1).realZipFile);
                 }
                 break;
             case R.id.search:
@@ -1217,10 +1258,10 @@ public class MainActivity extends ThemedActivity implements
         super.onSaveInstanceState(outState);
         if (selectedStorage != NO_VALUE)
             outState.putInt("selectitem", selectedStorage);
-        if (COPY_PATH != null)
-            outState.putParcelableArrayList("COPY_PATH", COPY_PATH);
-        if (MOVE_PATH != null)
-            outState.putParcelableArrayList("MOVE_PATH", MOVE_PATH);
+        if(pasteHelper != null) {
+            outState.putParcelable(PASTEHELPER_BUNDLE, pasteHelper);
+        }
+
         if (oppathe != null) {
             outState.putString("oppathe", oppathe);
             outState.putString("oppathe1", oppathe1);
@@ -1348,7 +1389,7 @@ public class MainActivity extends ThemedActivity implements
         fragmentTransaction.setCustomAnimations(R.anim.slide_in_top, R.anim.slide_in_bottom);
         Fragment zipFragment = new ZipExplorerFragment();
         Bundle bundle = new Bundle();
-        bundle.putString("path", path);
+        bundle.putString(ZipExplorerFragment.KEY_PATH, path);
         zipFragment.setArguments(bundle);
         fragmentTransaction.add(R.id.content_frame, zipFragment);
         fragmentTransaction.commitAllowingStateLoss();
@@ -2079,6 +2120,14 @@ public class MainActivity extends ThemedActivity implements
         supportInvalidateOptionsMenu();
     }
 
+    public PasteHelper getPaste() {
+        return pasteHelper;
+    }
+
+    public void setPaste(PasteHelper p) {
+        pasteHelper = p;
+        supportInvalidateOptionsMenu();
+    }
 
     @Override
     public void onNewIntent(Intent i) {

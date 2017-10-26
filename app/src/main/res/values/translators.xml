@@ -27,7 +27,7 @@
     <string name="french_translation_summary" translatable="false">Nicolas PIMENTEL, Primokorn, Renaud ROLLAND</string>
     <string name="russian_translation_summary" translatable="false">Pablo Luchiano, Kim BeeJay, Yaroslav Pronin</string>
     <string name="spanish_translation_summary" translatable="false">Jose Miguel Sarasola, Roberto M.F. (Roboe)</string>
-    <string name="basque_translation_summary" translatable="false">Aitor Beriain</string>
+    <string name="basque_translation_summary" translatable="false">Aitor Beriain, Asier Iturralde Sarasola</string>
     <string name="chinese_translation_summary" translatable="false">amtlib-dot-dll, Felix2yu, Charles Kane</string>
     <string name="serbian_translation_summary" translatable="false">Mladen Pejaković</string>
     <string name="turkish_translation_summary" translatable="false">Hakan Güven</string>
@@ -45,6 +45,7 @@
     <string name="app_version" translatable="false">v3.2.1</string>
     <string name="author_1" translatable="false">Arpit Khurana</string>
     <string name="author_2" translatable="false">Vishal Nehra</string>
+    <string name="developer_1" translatable="false">Emmanuel Messulam</string>
 
     <string name="contributor_1_title" translatable="false">Team MoKee</string>
     <string name="contributor_2_title" translatable="false">CookIcons.co</string>

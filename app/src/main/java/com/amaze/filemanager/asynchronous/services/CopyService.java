@@ -196,7 +196,8 @@ public class CopyService extends Service {
             watcherUtil.stopWatch();
             generateNotification(copy.failedFOps, move);
 
-            Intent intent = new Intent("loadlist");
+            Intent intent = new Intent(MainActivity.KEY_INTENT_LOAD_LIST);
+            intent.putExtra(MainActivity.KEY_INTENT_LOAD_LIST_FILE, targetPath);
             sendBroadcast(intent);
             stopSelf();
         }

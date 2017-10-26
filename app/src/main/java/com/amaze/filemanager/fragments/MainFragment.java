@@ -36,6 +36,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
+import android.media.MediaScannerConnection;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -79,9 +80,10 @@ import com.amaze.filemanager.database.CloudHandler;
 import com.amaze.filemanager.database.CryptHandler;
 import com.amaze.filemanager.database.models.EncryptedEntry;
 import com.amaze.filemanager.database.models.Tab;
-import com.amaze.filemanager.filesystem.HybridFileParcelable;
 import com.amaze.filemanager.filesystem.HybridFile;
+import com.amaze.filemanager.filesystem.HybridFileParcelable;
 import com.amaze.filemanager.filesystem.MediaStoreHack;
+import com.amaze.filemanager.filesystem.PasteHelper;
 import com.amaze.filemanager.fragments.preference_fragments.PrefFrag;
 import com.amaze.filemanager.ui.LayoutElementParcelable;
 import com.amaze.filemanager.ui.dialogs.GeneralDialogCreation;
@@ -93,7 +95,6 @@ import com.amaze.filemanager.ui.views.FastScroller;
 import com.amaze.filemanager.ui.views.RoundedImageView;
 import com.amaze.filemanager.utils.BottomBarButtonPath;
 import com.amaze.filemanager.utils.DataUtils;
-import com.amaze.filemanager.utils.GenericFileProvider;
 import com.amaze.filemanager.utils.MainActivityHelper;
 import com.amaze.filemanager.utils.OTGUtil;
 import com.amaze.filemanager.utils.OpenMode;
@@ -136,7 +137,7 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
      * {@link MainFragment#IS_LIST} boolean to identify if the view is a list or grid
      */
     public boolean IS_LIST = true;
-    public IconHolder ic;
+    public IconHolder iconHolder;
     public SwipeRefreshLayout mSwipeRefreshLayout;
     public int file_count, folder_count, columns;
     public String smbPath;
@@ -174,6 +175,7 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
     private DataUtils dataUtils = DataUtils.getInstance();
     private boolean isEncryptOpen = false;       // do we have to open a file when service is begin destroyed
     private HybridFileParcelable encryptBaseFile;            // the cached base file which we're to open, delete it later
+    private MediaScannerConnection mediaScannerConnection;
 
     // defines the current visible tab, default either 0 or 1
     //private int mCurrentTab;
@@ -288,7 +290,7 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
         HybridFile f = new HybridFile(OpenMode.UNKNOWN, CURRENT_PATH);
         f.generateMode(getActivity());
         getMainActivity().getAppbar().getBottomBar().setClickListener();
-        ic = new IconHolder(getActivity(), SHOW_THUMBS, !IS_LIST);
+        iconHolder = new IconHolder(getActivity(), SHOW_THUMBS, !IS_LIST);
 
         if (utilsProvider.getAppTheme().equals(AppTheme.LIGHT) && !IS_LIST) {
             listView.setBackgroundColor(Utils.getColor(getContext(), R.color.grid_background_light));
@@ -365,7 +367,7 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
     void switchToGrid() {
         IS_LIST = false;
 
-        ic = new IconHolder(getActivity(), SHOW_THUMBS, !IS_LIST);
+        iconHolder = new IconHolder(getActivity(), SHOW_THUMBS, !IS_LIST);
         folder = new BitmapDrawable(res, mFolderBitmap);
         fixIcons(true);
 
@@ -393,7 +395,7 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
             listView.setBackgroundDrawable(null);
         }
 
-        ic = new IconHolder(getActivity(), SHOW_THUMBS, !IS_LIST);
+        iconHolder = new IconHolder(getActivity(), SHOW_THUMBS, !IS_LIST);
         folder = new BitmapDrawable(res, mFolderBitmap);
         fixIcons(true);
         if (mLayoutManager == null)
@@ -645,7 +647,7 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
 
                         for (LayoutElementParcelable element : checkedItems) {
                             HybridFileParcelable baseFile = element.generateBaseFile();
-                            Uri resultUri = getUriForBaseFile(baseFile);
+                            Uri resultUri = Utils.getUriForBaseFile(getActivity(), baseFile);
 
                             if (resultUri != null) {
                                 resulturis.add(resultUri);
@@ -728,25 +730,19 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
                     mode.finish();
                     return true;
                 case R.id.cpy:
-                    getMainActivity().MOVE_PATH = null;
-                    ArrayList<HybridFileParcelable> copies = new ArrayList<>();
-                    for (int i2 = 0; i2 < checkedItems.size(); i2++) {
-                        copies.add(checkedItems.get(i2).generateBaseFile());
+                case R.id.cut: {
+                    HybridFileParcelable[] copies = new HybridFileParcelable[checkedItems.size()];
+                    for (int i = 0; i < checkedItems.size(); i++) {
+                        copies[i] = checkedItems.get(i).generateBaseFile();
                     }
-                    getMainActivity().COPY_PATH = copies;
-                    getMainActivity().supportInvalidateOptionsMenu();
+                    int op = item.getItemId() == R.id.cpy? PasteHelper.OPERATION_COPY:PasteHelper.OPERATION_CUT;
+
+                    PasteHelper pasteHelper = new PasteHelper(op, copies);
+                    getMainActivity().setPaste(pasteHelper);
+
                     mode.finish();
                     return true;
-                case R.id.cut:
-                    getMainActivity().COPY_PATH = null;
-                    ArrayList<HybridFileParcelable> copie = new ArrayList<>();
-                    for (int i3 = 0; i3 < checkedItems.size(); i3++) {
-                        copie.add(checkedItems.get(i3).generateBaseFile());
-                    }
-                    getMainActivity().MOVE_PATH = copie;
-                    getMainActivity().supportInvalidateOptionsMenu();
-                    mode.finish();
-                    return true;
+                }
                 case R.id.compress:
                     ArrayList<HybridFileParcelable> copies1 = new ArrayList<>();
                     for (int i4 = 0; i4 < checkedItems.size(); i4++) {
@@ -801,6 +797,40 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
                 case FILE:
                     // local file system don't need an explicit load, we've set an observer to
                     // take actions on creation/moving/deletion/modification of file on current path
+
+                    // run media scanner
+                    String[] path = new String[1];
+                    String arg = intent.getStringExtra(MainActivity.KEY_INTENT_LOAD_LIST_FILE);
+
+                    // run media scanner for only one context
+                    if (arg != null && getMainActivity().getCurrentMainFragment() == MainFragment.this) {
+
+                        if (Build.VERSION.SDK_INT >= 19) {
+
+                            path[0] = arg;
+
+                            MediaScannerConnection.MediaScannerConnectionClient mediaScannerConnectionClient = new MediaScannerConnection.MediaScannerConnectionClient() {
+                                @Override
+                                public void onMediaScannerConnected() {
+
+                                }
+
+                                @Override
+                                public void onScanCompleted(String path, Uri uri) {
+
+                                    Log.d("SCAN completed", path);
+                                }
+                            };
+
+                            if (mediaScannerConnection != null) {
+                                mediaScannerConnection.disconnect();
+                            }
+                            mediaScannerConnection = new MediaScannerConnection(context, mediaScannerConnectionClient);
+                            //FileUtils.scanFile(context, mediaScannerConnection, path);
+                        } else {
+                            FileUtils.scanFile(arg, context);
+                        }
+                    }
                     //break;
                 default:
                     updateList();
@@ -977,7 +1007,7 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
 
             Intent intentresult = new Intent();
 
-            Uri resultUri = getUriForBaseFile(baseFile);
+            Uri resultUri = Utils.getUriForBaseFile(getActivity(), baseFile);
             intentresult.setAction(Intent.ACTION_SEND);
             intentresult.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
@@ -987,39 +1017,6 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
             getActivity().setResult(FragmentActivity.RESULT_OK, intentresult);
             getActivity().finish();
             //mode.finish();
-        }
-    }
-
-    /**
-     * Returns uri associated to specific basefile
-     * @param baseFile
-     * @return
-     */
-    private Uri getUriForBaseFile(HybridFileParcelable baseFile) {
-
-        switch (baseFile.getMode()) {
-            case FILE:
-            case ROOT:
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-
-                    return GenericFileProvider.getUriForFile(getActivity(), GenericFileProvider.PROVIDER_NAME,
-                            new File(baseFile.getPath()));
-                } else {
-                    return Uri.fromFile(new File(baseFile.getPath()));
-                }
-            case OTG:
-                return OTGUtil.getDocumentFile(baseFile.getPath(), getContext(), true).getUri();
-            case SMB:
-            case DROPBOX:
-            case GDRIVE:
-            case ONEDRIVE:
-            case BOX:
-                Toast.makeText(getActivity(),
-                        getActivity().getResources().getString(R.string.smb_launch_error),
-                        Toast.LENGTH_LONG).show();
-                return null;
-            default:
-                return null;
         }
     }
 
@@ -1431,7 +1428,7 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
 
     public void updateList() {
         computeScroll();
-        ic.cleanup();
+        iconHolder.cleanup();
         loadlist((CURRENT_PATH), true, openMode);
     }
 
@@ -1458,7 +1455,7 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
     @Override
     public void onResume() {
         super.onResume();
-        (getActivity()).registerReceiver(receiver2, new IntentFilter("loadlist"));
+        (getActivity()).registerReceiver(receiver2, new IntentFilter(MainActivity.KEY_INTENT_LOAD_LIST));
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
 
@@ -1485,6 +1482,9 @@ public class MainFragment extends android.support.v4.app.Fragment implements Bot
 
         if (customFileObserver != null)
             customFileObserver.stopWatching();
+
+        if (mediaScannerConnection != null)
+            mediaScannerConnection.disconnect();
     }
 
     void fixIcons(boolean forceReload) {

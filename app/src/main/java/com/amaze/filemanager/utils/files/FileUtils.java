@@ -41,8 +41,8 @@ import android.preference.PreferenceManager;
 import android.provider.BaseColumns;
 import android.provider.MediaStore;
 import android.support.v4.provider.DocumentFile;
-import android.support.v4.util.Pair;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
@@ -50,8 +50,8 @@ import com.afollestad.materialdialogs.MaterialDialog;
 import com.amaze.filemanager.R;
 import com.amaze.filemanager.activities.DatabaseViewerActivity;
 import com.amaze.filemanager.activities.MainActivity;
-import com.amaze.filemanager.filesystem.HybridFileParcelable;
 import com.amaze.filemanager.filesystem.HybridFile;
+import com.amaze.filemanager.filesystem.HybridFileParcelable;
 import com.amaze.filemanager.fragments.preference_fragments.PrefFrag;
 import com.amaze.filemanager.ui.LayoutElementParcelable;
 import com.amaze.filemanager.ui.dialogs.GeneralDialogCreation;
@@ -61,6 +61,7 @@ import com.amaze.filemanager.utils.DataUtils;
 import com.amaze.filemanager.utils.OTGUtil;
 import com.amaze.filemanager.utils.OnProgressUpdate;
 import com.amaze.filemanager.utils.OpenMode;
+import com.amaze.filemanager.utils.application.AppConfig;
 import com.amaze.filemanager.utils.cloud.CloudUtil;
 import com.amaze.filemanager.utils.share.ShareTask;
 import com.amaze.filemanager.utils.theme.AppTheme;
@@ -71,6 +72,7 @@ import java.io.File;
 import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 
 import jcifs.smb.SmbFile;
@@ -167,19 +169,27 @@ public class FileUtils {
 
     public static void scanFile(String path, Context c) {
         System.out.println(path + " " + Build.VERSION.SDK_INT);
-        if (Build.VERSION.SDK_INT >= 19) {
-            MediaScannerConnection.scanFile(c, new String[]{path}, null, new MediaScannerConnection.OnScanCompletedListener() {
 
-                @Override
-                public void onScanCompleted(String path, Uri uri) {
+        Uri contentUri = Uri.fromFile(new File(path));
+        Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, contentUri);
+        c.sendBroadcast(mediaScanIntent);
+    }
 
-                }
-            });
-        } else {
-            Uri contentUri = Uri.fromFile(new File(path));
-            Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, contentUri);
-            c.sendBroadcast(mediaScanIntent);
-        }
+    /**
+     * Starts a media scanner to let file system know changes done to files
+     */
+    public static void scanFile(final Context context, final MediaScannerConnection mediaScannerConnection, final String[] paths) {
+
+        Log.d("SCAN started", paths[0]);
+
+        AppConfig.runInBackground(new Runnable() {
+            @Override
+            public void run() {
+
+                mediaScannerConnection.connect();
+                mediaScannerConnection.scanFile(context, paths, null, null);
+            }
+        });
     }
 
     public static void crossfade(View buttons,final View pathbar) {
@@ -635,19 +645,25 @@ public class FileUtils {
         }
     }
 
-    public static Pair<ArrayList<String>, ArrayList<String>> getPaths(String path) {
-        ArrayList<String> names = new ArrayList<>();
+    public static String[] getFolderNamesInPath(String path) {
+        if(!path.endsWith("/")) path += "/";
+        return ("root" + path).split("/");
+    }
+
+    public static String[] getPathsInPath(String path) {
+        if(path.endsWith("/")) path = path.substring(0, path.length()-1);
+
         ArrayList<String> paths = new ArrayList<>();
-        while (path.contains("/")) {
+
+        while (path.length() > 0) {
             paths.add(path);
-            names.add(path.substring(1 + path.lastIndexOf("/"), path.length()));
             path = path.substring(0, path.lastIndexOf("/"));
         }
-        names.remove("");
-        paths.remove("/");
-        names.add("root");
+
         paths.add("/");
-        return new Pair<>(names, paths);
+        Collections.reverse(paths);
+
+        return paths.toArray(new String[paths.size()]);
     }
 
     public static boolean canListFiles(File f) {
