@@ -20,11 +20,11 @@ import android.widget.Toast;
 import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.amaze.filemanager.R;
-import com.amaze.filemanager.activities.ThemedActivity;
 import com.amaze.filemanager.activities.MainActivity;
+import com.amaze.filemanager.activities.superclasses.ThemedActivity;
 import com.amaze.filemanager.adapters.RecyclerArrayAdapter;
-import com.amaze.filemanager.utils.Computer;
 import com.amaze.filemanager.utils.SmbUtil;
+import com.amaze.filemanager.utils.ComputerParcelable;
 import com.amaze.filemanager.utils.SubnetScanner;
 import com.amaze.filemanager.utils.color.ColorUsage;
 import com.amaze.filemanager.utils.provider.UtilitiesProviderInterface;
@@ -40,7 +40,7 @@ public class SmbSearchDialog extends DialogFragment {
     private UtilitiesProviderInterface utilsProvider;
 
     listViewAdapter listViewAdapter;
-    ArrayList<Computer> computers = new ArrayList<>();
+    ArrayList<ComputerParcelable> computers = new ArrayList<>();
     int accentColor;
     SubnetScanner subnetScanner;
 
@@ -65,61 +65,50 @@ public class SmbSearchDialog extends DialogFragment {
         builder.title(R.string.searchingdevices);
         builder.negativeColor(accentColor);
         builder.negativeText(R.string.cancel);
-        builder.onNegative(new MaterialDialog.SingleButtonCallback() {
-            @Override
-            public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
-                if (subnetScanner != null)
-                    subnetScanner.interrupt();
-                dismiss();
-            }
+        builder.onNegative((dialog, which) -> {
+            if (subnetScanner != null)
+                subnetScanner.interrupt();
+            dismiss();
         });
-        builder.onPositive(new MaterialDialog.SingleButtonCallback() {
-            @Override
-            public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
-                if (subnetScanner != null)
-                    subnetScanner.interrupt();
-                if (getActivity() != null && getActivity() instanceof MainActivity) {
-                    dismiss();
-                    MainActivity mainActivity = (MainActivity) getActivity();
-                    mainActivity.showSMBDialog("", "", SmbUtil.SMB_VERSION.V1, false);
-                }
+
+        builder.onPositive((dialog, which) -> {
+            if (subnetScanner != null)
+                subnetScanner.interrupt();
+            if (getActivity() != null && getActivity() instanceof MainActivity) {
+                dismiss();
+                MainActivity mainActivity = (MainActivity) getActivity();
+                mainActivity.showSMBDialog("", "", SmbUtil.SMB_VERSION.V1, false);
             }
         });
         builder.positiveText(R.string.use_custom_ip);
         builder.positiveColor(accentColor);
-        computers.add(new Computer("-1", "-1"));
+        computers.add(new ComputerParcelable("-1", "-1"));
         listViewAdapter = new listViewAdapter(getActivity(), R.layout.smb_computers_row, computers);
         subnetScanner = new SubnetScanner(getActivity());
         subnetScanner.setObserver(new SubnetScanner.ScanObserver() {
             @Override
-            public void computerFound(final Computer computer) {
+            public void computerFound(final ComputerParcelable computer) {
                 if (getActivity() != null)
-                    getActivity().runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (!computers.contains(computer))
-                                computers.add(computer);
-                            listViewAdapter.notifyDataSetChanged();
-                        }
+                    getActivity().runOnUiThread(() -> {
+                        if (!computers.contains(computer))
+                            computers.add(computer);
+                        listViewAdapter.notifyDataSetChanged();
                     });
             }
 
             @Override
             public void searchFinished() {
                 if (getActivity() != null) {
-                    getActivity().runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (computers.size() == 1) {
-                                dismiss();
-                                Toast.makeText(getActivity(), getResources().getString(R.string.nodevicefound), Toast.LENGTH_SHORT).show();
-                                MainActivity mainActivity = (MainActivity) getActivity();
-                                mainActivity.showSMBDialog("", "", SmbUtil.SMB_VERSION.V1, false);
-                                return;
-                            }
-                            computers.remove(computers.size() - 1);
-                            listViewAdapter.notifyDataSetChanged();
+                    getActivity().runOnUiThread(() -> {
+                        if (computers.size() == 1) {
+                            dismiss();
+                            Toast.makeText(getActivity(), getResources().getString(R.string.nodevicefound), Toast.LENGTH_SHORT).show();
+                            MainActivity mainActivity = (MainActivity) getActivity();
+                            mainActivity.showSMBDialog("", "", SmbUtil.SMB_VERSION.V1, false);
+                            return;
                         }
+                        computers.remove(computers.size() - 1);
+                        listViewAdapter.notifyDataSetChanged();
                     });
                 }
             }
@@ -130,14 +119,14 @@ public class SmbSearchDialog extends DialogFragment {
         return builder.build();
     }
 
-    private class listViewAdapter extends RecyclerArrayAdapter<Computer, listViewAdapter.ViewHolder> {
+    private class listViewAdapter extends RecyclerArrayAdapter<ComputerParcelable, listViewAdapter.ViewHolder> {
         private static final int VIEW_PROGRESSBAR = 1;
         private static final int VIEW_ELEMENT = 2;
 
         LayoutInflater mInflater;
         Context context;
 
-        public listViewAdapter(Context context, @LayoutRes int resource, List<Computer> objects) {
+        public listViewAdapter(Context context, @LayoutRes int resource, List<ComputerParcelable> objects) {
             this.context = context;
             addAll(objects);
             mInflater = (LayoutInflater) context
@@ -171,7 +160,7 @@ public class SmbSearchDialog extends DialogFragment {
                 super(itemView);
             }
 
-            public void render(final int p, Computer f) {
+            public void render(final int p, ComputerParcelable f) {
 
             }
         }
@@ -194,18 +183,15 @@ public class SmbSearchDialog extends DialogFragment {
             }
 
             @Override
-            public void render(final int p, Computer f) {
-                rootView.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        if (subnetScanner != null)
-                            subnetScanner.interrupt();
-                        if (getActivity() != null && getActivity() instanceof MainActivity) {
-                            dismiss();
-                            MainActivity mainActivity = (MainActivity) getActivity();
-                            mainActivity.showSMBDialog(listViewAdapter.getItem(p).name,
-                                    listViewAdapter.getItem(p).addr, SmbUtil.SMB_VERSION.V1, false);
-                        }
+            public void render(final int p, ComputerParcelable f) {
+                rootView.setOnClickListener(v -> {
+                    if (subnetScanner != null)
+                        subnetScanner.interrupt();
+                    if (getActivity() != null && getActivity() instanceof MainActivity) {
+                        dismiss();
+                        MainActivity mainActivity = (MainActivity) getActivity();
+                        mainActivity.showSMBDialog(listViewAdapter.getItem(p).name,
+                                listViewAdapter.getItem(p).addr, SmbUtil.SMB_VERSION.V1, false);
                     }
                 });
 
@@ -219,7 +205,7 @@ public class SmbSearchDialog extends DialogFragment {
 
         @Override
         public int getItemViewType(int position) {
-            Computer f = getItem(position);
+            ComputerParcelable f = getItem(position);
             if (f.addr.equals("-1")) {
                 return VIEW_PROGRESSBAR;
             } else {

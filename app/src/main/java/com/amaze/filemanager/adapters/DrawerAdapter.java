@@ -36,10 +36,10 @@ import android.widget.Toast;
 
 import com.amaze.filemanager.R;
 import com.amaze.filemanager.activities.MainActivity;
-import com.amaze.filemanager.activities.ThemedActivity;
+import com.amaze.filemanager.activities.superclasses.ThemedActivity;
 import com.amaze.filemanager.database.CloudHandler;
 import com.amaze.filemanager.database.models.SmbModel;
-import com.amaze.filemanager.filesystem.HFile;
+import com.amaze.filemanager.filesystem.HybridFile;
 import com.amaze.filemanager.filesystem.Operations;
 import com.amaze.filemanager.filesystem.RootHelper;
 import com.amaze.filemanager.ui.dialogs.GeneralDialogCreation;
@@ -122,72 +122,65 @@ public class DrawerAdapter extends ArrayAdapter<Item> {
             } else {
                 view.setBackgroundResource(R.drawable.safr_ripple_black);
             }
-            view.setOnClickListener(new View.OnClickListener() {
+            view.setOnClickListener(p1 -> {
+                EntryItem item = (EntryItem) getItem(position);
 
-                public void onClick(View p1) {
-                    EntryItem item = (EntryItem) getItem(position);
+                if (dataUtils.containsBooks(new String[]{item.getTitle(), item.getPath()}) != -1) {
 
-                    if (dataUtils.containsBooks(new String[]{item.getTitle(), item.getPath()}) != -1) {
-
-                        checkForPath(item.getPath());
-                    }
-
-                    if (dataUtils.getAccounts().size() > 0 && (item.getPath().startsWith(CloudHandler.CLOUD_PREFIX_BOX) ||
-                                    item.getPath().startsWith(CloudHandler.CLOUD_PREFIX_DROPBOX) ||
-                                    item.getPath().startsWith(CloudHandler.CLOUD_PREFIX_ONE_DRIVE) ||
-                                    item.getPath().startsWith(CloudHandler.CLOUD_PREFIX_GOOGLE_DRIVE))) {
-                        // we have cloud accounts, try see if token is expired or not
-                        CloudUtil.checkToken(item.getPath(), m);
-                    }
-                    m.selectItem(position);
+                    checkForPath(item.getPath());
                 }
-                // TODO: Implement this method
 
+                if (dataUtils.getAccounts().size() > 0 && (item.getPath().startsWith(CloudHandler.CLOUD_PREFIX_BOX) ||
+                                item.getPath().startsWith(CloudHandler.CLOUD_PREFIX_DROPBOX) ||
+                                item.getPath().startsWith(CloudHandler.CLOUD_PREFIX_ONE_DRIVE) ||
+                                item.getPath().startsWith(CloudHandler.CLOUD_PREFIX_GOOGLE_DRIVE))) {
+                    // we have cloud accounts, try see if token is expired or not
+                    CloudUtil.checkToken(item.getPath(), m);
+                }
+                m.selectItem(position);
             });
-            view.setOnLongClickListener(new View.OnLongClickListener() {
-                @Override
-                public boolean onLongClick(View v) {
-                    if (!getItem(position).isSection())
-                        // not to remove the first bookmark (storage) and permanent bookmarks
-                        if (position > m.storage_count && position < values.size() - 7) {
-                            EntryItem item = (EntryItem) getItem(position);
-                            String title = item.getTitle();
-                            String path = (item).getPath();
-                            if (dataUtils.containsBooks(new String[]{item.getTitle(), path}) != -1) {
-                                m.renameBookmark((item).getTitle(), path);
-                            } else if (path.startsWith("smb:/")) {
-                                SmbModel smbModel = dataUtils.getServer(title, path);
 
-                                SmbUtil.SMB_VERSION smb_version = null;
-                                if (smbModel != null) {
-                                     smb_version = smbModel.getSmbVersion();
-                                }
-                                m.showSMBDialog(title, path, smb_version, true);
-                            } else if (path.startsWith(CloudHandler.CLOUD_PREFIX_DROPBOX)) {
+            view.setOnLongClickListener(v -> {
+                if (!getItem(position).isSection())
+                    // not to remove the first bookmark (storage) and permanent bookmarks
+                    if (position > m.storage_count && position < values.size() - 7) {
+                        EntryItem item = (EntryItem) getItem(position);
+                        String title = item.getTitle();
+                        String path = (item).getPath();
+                        if (dataUtils.containsBooks(new String[]{item.getTitle(), path}) != -1) {
+                            m.renameBookmark((item).getTitle(), path);
+                        } else if (path.startsWith("smb:/")) {
+                            SmbModel smbModel = dataUtils.getServer(title, path);
 
-                                GeneralDialogCreation.showCloudDialog(m, utilsProvider.getAppTheme(), OpenMode.DROPBOX);
-
-                            } else if (path.startsWith(CloudHandler.CLOUD_PREFIX_GOOGLE_DRIVE)) {
-
-                                GeneralDialogCreation.showCloudDialog(m, utilsProvider.getAppTheme(), OpenMode.GDRIVE);
-
-                            } else if (path.startsWith(CloudHandler.CLOUD_PREFIX_BOX)) {
-
-                                GeneralDialogCreation.showCloudDialog(m, utilsProvider.getAppTheme(), OpenMode.BOX);
-
-                            } else if (path.startsWith(CloudHandler.CLOUD_PREFIX_ONE_DRIVE)) {
-
-                                GeneralDialogCreation.showCloudDialog(m, utilsProvider.getAppTheme(), OpenMode.ONEDRIVE);
+                            SmbUtil.SMB_VERSION smb_version = null;
+                            if (smbModel != null) {
+                                smb_version = smbModel.getSmbVersion();
                             }
-                        } else if (position < m.storage_count) {
-                            String path = ((EntryItem) getItem(position)).getPath();
-                            if (!path.equals("/"))
-                                GeneralDialogCreation.showPropertiesDialogForStorage(RootHelper.generateBaseFile(new File(path), true), m, utilsProvider.getAppTheme());
-                        }
+                            m.showSMBDialog(title, path, smb_version, true);
+                        } else if (path.startsWith(CloudHandler.CLOUD_PREFIX_DROPBOX)) {
 
-                    // return true to denote no further processing
-                    return true;
-                }
+                            GeneralDialogCreation.showCloudDialog(m, utilsProvider.getAppTheme(), OpenMode.DROPBOX);
+
+                        } else if (path.startsWith(CloudHandler.CLOUD_PREFIX_GOOGLE_DRIVE)) {
+
+                            GeneralDialogCreation.showCloudDialog(m, utilsProvider.getAppTheme(), OpenMode.GDRIVE);
+
+                        } else if (path.startsWith(CloudHandler.CLOUD_PREFIX_BOX)) {
+
+                            GeneralDialogCreation.showCloudDialog(m, utilsProvider.getAppTheme(), OpenMode.BOX);
+
+                        } else if (path.startsWith(CloudHandler.CLOUD_PREFIX_ONE_DRIVE)) {
+
+                            GeneralDialogCreation.showCloudDialog(m, utilsProvider.getAppTheme(), OpenMode.ONEDRIVE);
+                        }
+                    } else if (position < m.storage_count) {
+                        String path = ((EntryItem) getItem(position)).getPath();
+                        if (!path.equals("/"))
+                            GeneralDialogCreation.showPropertiesDialogForStorage(RootHelper.generateBaseFile(new File(path), true), m, utilsProvider.getAppTheme());
+                    }
+
+                // return true to denote no further processing
+                return true;
             });
 
             txtTitle.setText(((EntryItem) (values.get(position))).getTitle());
@@ -231,27 +224,27 @@ public class DrawerAdapter extends ArrayAdapter<Item> {
                     ThemedActivity.rootMode, new Operations.ErrorCallBack() {
                         //TODO empty
                         @Override
-                        public void exists(HFile file) {
+                        public void exists(HybridFile file) {
 
                         }
 
                         @Override
-                        public void launchSAF(HFile file) {
+                        public void launchSAF(HybridFile file) {
 
                         }
 
                         @Override
-                        public void launchSAF(HFile file, HFile file1) {
+                        public void launchSAF(HybridFile file, HybridFile file1) {
 
                         }
 
                         @Override
-                        public void done(HFile hFile, boolean b) {
+                        public void done(HybridFile hFile, boolean b) {
 
                         }
 
                         @Override
-                        public void invalidName(HFile file) {
+                        public void invalidName(HybridFile file) {
 
                         }
                     });

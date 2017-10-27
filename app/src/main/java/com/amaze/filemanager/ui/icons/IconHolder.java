@@ -98,24 +98,31 @@ public class IconHolder {
         private synchronized void processResult(LoadResult result) {
             // Cache the new drawable
             final String filePath =(result.fso);
-            mAppIcons.put(filePath, result.result);
+
+            synchronized (mAppIcons) {
+
+                mAppIcons.put(filePath, result.result);
+            }
 
             // find the request for it
-            for (Map.Entry<ImageView, String> entry : mRequests.entrySet()) {
-                final ImageView imageView = entry.getKey();
-                final String fso = entry.getValue();
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    if (Objects.equals(fso, result.fso)) {
-                        imageView.setImageBitmap(result.result);
-                        mRequests.remove(imageView);
-                        break;
-                    }
-                } else {
-                    if (fso.equals(result.fso)) {
+            synchronized (mRequests) {
 
-                        imageView.setImageBitmap(result.result);
-                        mRequests.remove(imageView);
-                        break;
+                for (Map.Entry<ImageView, String> entry : mRequests.entrySet()) {
+                    final ImageView imageView = entry.getKey();
+                    final String fso = entry.getValue();
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        if (Objects.equals(fso, result.fso)) {
+                            imageView.setImageBitmap(result.result);
+                            mRequests.remove(imageView);
+                            break;
+                        }
+                    } else {
+                        if (fso.equals(result.fso)) {
+
+                            imageView.setImageBitmap(result.result);
+                            mRequests.remove(imageView);
+                            break;
+                        }
                     }
                 }
             }
@@ -175,22 +182,18 @@ public class IconHolder {
             iconView.setImageBitmap(this.mAppIcons.get(filePath));
             return;
         }
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-
-                mHandler.removeMessages(MSG_DESTROY);
-                if (mWorkerThread == null || mWorkerHandler==null) {
-                    mWorkerThread = new HandlerThread("IconHolderLoader");
-                    mWorkerThread.start();
-                    mWorkerHandler = new WorkerHandler(mWorkerThread.getLooper());
-                }
-
-                mRequests.put(iconView, fso);
-                Message msg = mWorkerHandler.obtainMessage(MSG_LOAD, fso);
-                msg.sendToTarget();
-
+        new Thread(() -> {
+            mHandler.removeMessages(MSG_DESTROY);
+            if (mWorkerThread == null || mWorkerHandler==null) {
+                mWorkerThread = new HandlerThread("IconHolderLoader");
+                mWorkerThread.start();
+                mWorkerHandler = new WorkerHandler(mWorkerThread.getLooper());
             }
+
+            mRequests.put(iconView, fso);
+            Message msg = mWorkerHandler.obtainMessage(MSG_LOAD, fso);
+            msg.sendToTarget();
+
         }).start();
     }
 

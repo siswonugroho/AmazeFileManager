@@ -6,6 +6,7 @@ import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.StrictMode;
+import android.support.v7.app.AppCompatDelegate;
 import android.text.TextUtils;
 import android.widget.Toast;
 
@@ -41,6 +42,7 @@ public class AppConfig extends LeakCanaryApplication {
     @Override
     public void onCreate() {
         super.onCreate();
+        AppCompatDelegate.setCompatVectorFromResourcesEnabled(true);//selector in srcCompat isn't supported without this
         mInstance = this;
 
         utilsProvider = new UtilitiesProvider(this);
@@ -144,11 +146,8 @@ public class AppConfig extends LeakCanaryApplication {
             final Context c = context;
             final String m = message;
 
-            ((AppConfig) context).runInApplicationThread(new Runnable() {
-                @Override
-                public void run() {
-                    Toast.makeText(c, m, Toast.LENGTH_LONG).show();
-                }
+            ((AppConfig) context).runInApplicationThread(() -> {
+                Toast.makeText(c, m, Toast.LENGTH_LONG).show();
             });
         }
     }

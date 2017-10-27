@@ -14,6 +14,7 @@ import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.v4.provider.DocumentFile;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.amaze.filemanager.R;
 import com.amaze.filemanager.activities.MainActivity;
@@ -194,12 +195,16 @@ public abstract class FileUtil {
                         String finalFilePath = currentPath + "/" + documentFile.getName();
                         DataUtils dataUtils = DataUtils.getInstance();
 
-                        HFile hFile = new HFile(OpenMode.UNKNOWN, currentPath);
+                        HybridFile hFile = new HybridFile(OpenMode.UNKNOWN, currentPath);
                         hFile.generateMode(mainActivity);
 
                         switch (hFile.getMode()) {
                             case FILE:
                             case ROOT:
+                                if (!FileUtil.isWritable(new File(currentPath))) {
+                                    AppConfig.toast(mainActivity, mainActivity.getResources().getString(R.string.not_allowed));
+                                    return null;
+                                }
                                 bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(finalFilePath));
                                 break;
                             case SMB:
@@ -414,7 +419,7 @@ public abstract class FileUtil {
     /**
      * Create a folder. The folder may even be on external SD card for Kitkat.
      *
-     * @deprecated use {@link #mkdirs(Context, HFile)}
+     * @deprecated use {@link #mkdirs(Context, HybridFile)}
      * @param file  The folder to be created.
      * @return True if creation was successful.
      */
@@ -450,7 +455,7 @@ public abstract class FileUtil {
         return false;
     }
 
-    public static boolean mkdirs(Context context, HFile file) {
+    public static boolean mkdirs(Context context, HybridFile file) {
         boolean isSuccessful = true;
         switch (file.mode) {
             case SMB:

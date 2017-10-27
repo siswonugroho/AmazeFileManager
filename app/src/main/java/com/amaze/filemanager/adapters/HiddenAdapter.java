@@ -2,6 +2,7 @@ package com.amaze.filemanager.adapters;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.support.annotation.LayoutRes;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
@@ -14,12 +15,12 @@ import android.widget.TextView;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.amaze.filemanager.R;
 import com.amaze.filemanager.activities.MainActivity;
-import com.amaze.filemanager.filesystem.BaseFile;
-import com.amaze.filemanager.filesystem.HFile;
+import com.amaze.filemanager.filesystem.HybridFileParcelable;
+import com.amaze.filemanager.filesystem.HybridFile;
 import com.amaze.filemanager.fragments.MainFragment;
-import com.amaze.filemanager.services.DeleteTask;
+import com.amaze.filemanager.asynchronous.asynctasks.DeleteTask;
 import com.amaze.filemanager.utils.DataUtils;
-import com.amaze.filemanager.utils.files.Futils;
+import com.amaze.filemanager.utils.files.FileUtils;
 import com.amaze.filemanager.utils.OpenMode;
 
 import java.io.File;
@@ -29,24 +30,24 @@ import java.util.ArrayList;
 /**
  * Created by Arpit on 16-11-2014.
  */
-public class HiddenAdapter extends RecyclerArrayAdapter<HFile, HiddenAdapter.ViewHolder> {
+public class HiddenAdapter extends RecyclerArrayAdapter<HybridFile, HiddenAdapter.ViewHolder> {
 
-    private Futils utils;
-
+    private SharedPreferences sharedPrefs;
     private MainFragment context;
     private Context c;
-    public ArrayList<HFile> items;
+    public ArrayList<HybridFile> items;
     private MaterialDialog materialDialog;
     private boolean hide;
     private DataUtils dataUtils = DataUtils.getInstance();
     ///	public HashMap<Integer, Boolean> myChecked = new HashMap<Integer, Boolean>();
 
-    public HiddenAdapter(Context context, MainFragment mainFrag, Futils utils, @LayoutRes int layoutId,
-                         ArrayList<HFile> items, MaterialDialog materialDialog, boolean hide) {
+    public HiddenAdapter(Context context, MainFragment mainFrag,  SharedPreferences sharedPreferences,
+                                @LayoutRes int layoutId, ArrayList<HybridFile> items,
+                                MaterialDialog materialDialog, boolean hide) {
         addAll(items);
-        this.utils = utils;
         this.c = context;
         this.context = mainFrag;
+        sharedPrefs = sharedPreferences;
         this.items = items;
         this.hide = hide;
         this.materialDialog = materialDialog;
@@ -81,7 +82,7 @@ public class HiddenAdapter extends RecyclerArrayAdapter<HFile, HiddenAdapter.Vie
             row = (LinearLayout) view.findViewById(R.id.bookmarkrow);
         }
 
-        void render(final int position, final HFile file) {
+        void render(final int position, final HybridFile file) {
             txtTitle.setText(file.getName());
             String a = file.getReadablePath(file.getPath());
             txtDesc.setText(a);
@@ -90,48 +91,33 @@ public class HiddenAdapter extends RecyclerArrayAdapter<HFile, HiddenAdapter.Vie
                 image.setVisibility(View.GONE);
 
             // TODO: move the listeners to the constructor
-            image.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    if (!file.isSmb() && file.isDirectory()) {
-                        ArrayList<BaseFile> a = new ArrayList<>();
-                        BaseFile baseFile = new BaseFile(items.get(position).getPath() + "/.nomedia");
-                        baseFile.setMode(OpenMode.FILE);
-                        a.add(baseFile);
-                        new DeleteTask(context.getActivity().getContentResolver(), c).execute((a));
-                    }
-                    dataUtils.removeHiddenFile(items.get(position).getPath());
-                    items.remove(items.get(position));
-                    notifyDataSetChanged();
+            image.setOnClickListener(view -> {
+                if (!file.isSmb() && file.isDirectory()) {
+                    ArrayList<HybridFileParcelable> a1 = new ArrayList<>();
+                    HybridFileParcelable baseFile = new HybridFileParcelable(items.get(position).getPath() + "/.nomedia");
+                    baseFile.setMode(OpenMode.FILE);
+                    a1.add(baseFile);
+                    new DeleteTask(context.getActivity().getContentResolver(), c).execute((a1));
                 }
+                dataUtils.removeHiddenFile(items.get(position).getPath());
+                items.remove(items.get(position));
+                notifyDataSetChanged();
             });
-            row.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    materialDialog.dismiss();
-                    new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (file.isDirectory()) {
-                                context.getActivity().runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        context.loadlist(file.getPath(), false, OpenMode.UNKNOWN);
-                                    }
-                                });
-                            } else {
-                                if (!file.isSmb()) {
-                                    context.getActivity().runOnUiThread(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            utils.openFile(new File(file.getPath()), (MainActivity) context.getActivity());
-                                        }
-                                    });
-                                }
-                            }
+            row.setOnClickListener(view -> {
+                materialDialog.dismiss();
+                new Thread(() -> {
+                    if (file.isDirectory()) {
+                        context.getActivity().runOnUiThread(() -> {
+                            context.loadlist(file.getPath(), false, OpenMode.UNKNOWN);
+                        });
+                    } else {
+                        if (!file.isSmb()) {
+                            context.getActivity().runOnUiThread(() -> {
+                                FileUtils.openFile(new File(file.getPath()), (MainActivity) context.getActivity(), sharedPrefs);
+                            });
                         }
-                    }).start();
-                }
+                    }
+                }).start();
             });
         }
     }

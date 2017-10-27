@@ -4,10 +4,10 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
-import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
 import android.support.annotation.NonNull;
+import android.support.v4.app.Fragment;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -26,16 +26,18 @@ import android.widget.TextView;
 import com.amaze.filemanager.R;
 import com.amaze.filemanager.activities.MainActivity;
 import com.amaze.filemanager.fragments.MainFragment;
-import com.amaze.filemanager.fragments.preference_fragments.Preffrag;
+import com.amaze.filemanager.fragments.TabFragment;
+import com.amaze.filemanager.fragments.ZipExplorerFragment;
+import com.amaze.filemanager.fragments.preference_fragments.PrefFrag;
 import com.amaze.filemanager.ui.dialogs.GeneralDialogCreation;
+import com.amaze.filemanager.utils.BottomBarButtonPath;
 import com.amaze.filemanager.utils.MainActivityHelper;
 import com.amaze.filemanager.utils.OpenMode;
 import com.amaze.filemanager.utils.Utils;
-import com.amaze.filemanager.utils.files.Futils;
+import com.amaze.filemanager.utils.files.FileUtils;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.Collections;
 
 /**
  * layout_appbar.xml contains the layout for AppBar and BottomBar
@@ -97,16 +99,7 @@ public class BottomBar implements View.OnTouchListener{
         buttonParams.gravity = Gravity.CENTER_VERTICAL;
 
         buttonRoot = new ImageButton(a);
-        buttonRoot.setImageDrawable(a.getResources().getDrawable(R.drawable.root));
         buttonRoot.setBackgroundColor(Color.TRANSPARENT);
-        buttonRoot.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View p1) {
-                MainFragment m = mainActivity.get().getCurrentMainFragment();
-                m.loadlist(("/"), false, m.openMode);
-                timer.cancel();
-                timer.start();
-            }
-        });
         buttonRoot.setLayoutParams(buttonParams);
 
         buttonStorage = new ImageButton(a);
@@ -122,11 +115,11 @@ public class BottomBar implements View.OnTouchListener{
 
             @Override
             public void onFinish() {
-                Futils.crossfadeInverse(buttons, pathLayout);
+                FileUtils.crossfadeInverse(buttons, pathLayout);
             }
         };
 
-        allowChangePaths = mainActivity.get().sharedPref.getBoolean(Preffrag.PREFERENCE_CHANGEPATHS, false);
+        allowChangePaths = mainActivity.get().getPrefs().getBoolean(PrefFrag.PREFERENCE_CHANGEPATHS, false);
 
         gestureDetector = new GestureDetector(a.getApplicationContext(), new GestureDetector.SimpleOnGestureListener() {
             @Override
@@ -136,12 +129,20 @@ public class BottomBar implements View.OnTouchListener{
 
             @Override
             public boolean onSingleTapConfirmed(MotionEvent e) {
-                MainFragment m = mainActivity.get().getCurrentMainFragment();
-                if (m.openMode == OpenMode.FILE) {
-                    Futils.crossfade(buttons, pathLayout);
+                Fragment fragmentAtFrame = mainActivity.get().getFragmentAtFrame();
+                if(fragmentAtFrame instanceof TabFragment) {
+                    MainFragment m = mainActivity.get().getCurrentMainFragment();
+                    if (m.openMode == OpenMode.FILE) {
+                        FileUtils.crossfade(buttons, pathLayout);
+                        timer.cancel();
+                        timer.start();
+                        showButtons(m);
+                    }
+                } else if (fragmentAtFrame instanceof ZipExplorerFragment) {
+                    FileUtils.crossfade(buttons, pathLayout);
                     timer.cancel();
                     timer.start();
-                    showButtons(m);
+                    showButtons((BottomBarButtonPath) fragmentAtFrame);
                 }
                 return false;
             }
@@ -150,7 +151,7 @@ public class BottomBar implements View.OnTouchListener{
             public void onLongPress(MotionEvent e) {
                 if(allowChangePaths &&
                         (!mainActivity.get().getCurrentMainFragment().results || buttons.getVisibility() == View.VISIBLE)) {
-                    GeneralDialogCreation.showChangePathsDialog(mainActivity, mainActivity.get().sharedPref);
+                    GeneralDialogCreation.showChangePathsDialog(mainActivity, mainActivity.get().getPrefs());
                 }
             }
         });
@@ -185,21 +186,25 @@ public class BottomBar implements View.OnTouchListener{
         return buttons.getVisibility() == View.VISIBLE;
     }
 
-    public void showButtons(final MainFragment mainFrag) {
-        final String path = mainFrag.getCurrentPath();
+    public void showButtons(final BottomBarButtonPath buttonPathInterface) {
+        final String path = buttonPathInterface.getPath();
         if (buttons.getVisibility() == View.VISIBLE) {
             lastUsedArrowButton = 0;
             lastUsedFolderButton = 0;
             buttons.removeAllViews();
             buttons.setMinimumHeight(pathLayout.getHeight());
 
-            Bundle bundle = Futils.getPaths(path, mainActivity.get());
-            ArrayList<String> names = bundle.getStringArrayList("names");
-            ArrayList<String> rnames = bundle.getStringArrayList("names");
-            Collections.reverse(rnames);
-            
-            final ArrayList<String> rpaths = bundle.getStringArrayList("paths");
-            Collections.reverse(rpaths);
+            buttonRoot.setImageDrawable(mainActivity.get().getResources().getDrawable(buttonPathInterface.getRootDrawable()));
+            buttonRoot.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View p1) {
+                    buttonPathInterface.changePath("/");
+                    timer.cancel();
+                    timer.start();
+                }
+            });
+
+            String[] names = FileUtils.getFolderNamesInPath(path);
+            final String[] paths = FileUtils.getPathsInPath(path);
 
             View view = new View(mainActivity.get());
             LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(
@@ -207,25 +212,32 @@ public class BottomBar implements View.OnTouchListener{
             view.setLayoutParams(params1);
             buttons.addView(view);
 
-            for (int i = 0; i < names.size(); i++) {
+            for (int i = 0; i < names.length; i++) {
                 final int k = i;
-                if (rpaths.get(i).equals("/")) {
+                if (paths[i].equals("/")) {
                     buttons.addView(buttonRoot);
-                } else if (Futils.isStorage(rpaths.get(i))) {
+                } else if (FileUtils.isStorage(paths[i])) {
                     buttonStorage.setOnClickListener(new View.OnClickListener() {
                         public void onClick(View p1) {
-                            mainFrag.loadlist((rpaths.get(k)), false, mainFrag.openMode);
+                            buttonPathInterface.changePath(paths[k]);
                             timer.cancel();
                             timer.start();
                         }
                     });
                     buttons.addView(buttonStorage);
                 } else {
-                    Button button = createFolderButton(rnames.get(i));
+                    Button button = createFolderButton(names[i]);
+                    button.setOnClickListener(new View.OnClickListener() {
+                        public void onClick(View p1) {
+                            buttonPathInterface.changePath(paths[k]);
+                            timer.cancel();
+                            timer.start();
+                        }
+                    });
                     buttons.addView(button);
                 }
 
-                if (names.size() - i != 1) {
+                if (names.length - i != 1) {
                     buttons.addView(createArrow());
                 }
             }
@@ -284,7 +296,7 @@ public class BottomBar implements View.OnTouchListener{
     }
 
     public void updatePath(@NonNull final String news, boolean results, String query, OpenMode openmode,
-                           int folderCount, int fileCount) {
+                           int folderCount, int fileCount, BottomBarButtonPath buttonPathInterface) {
 
         if (news.length() == 0) return;
 
@@ -321,179 +333,184 @@ public class BottomBar implements View.OnTouchListener{
         final String oldPath = fullPathText.getText().toString();
         if (oldPath.equals(newPath)) return;
 
-        final Animation slideIn = AnimationUtils.loadAnimation(mainActivity.get(), R.anim.slide_in);
-        Animation slideOut = AnimationUtils.loadAnimation(mainActivity.get(), R.anim.slide_out);
+        if (!areButtonsShowing()) {
+            final Animation slideIn = AnimationUtils.loadAnimation(mainActivity.get(), R.anim.slide_in);
+            Animation slideOut = AnimationUtils.loadAnimation(mainActivity.get(), R.anim.slide_out);
 
-        if (newPath.length() > oldPath.length() && newPath.contains(oldPath) && oldPath.length() != 0) {
-            // navigate forward
-            fullPathAnim.setAnimation(slideIn);
-            fullPathAnim.animate().setListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    super.onAnimationEnd(animation);
-                    new Handler().postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            fullPathAnim.setVisibility(View.GONE);
-                            fullPathText.setText(newPath);
-                        }
-                    }, PATH_ANIM_END_DELAY);
-                }
+            if (newPath.length() > oldPath.length() && newPath.contains(oldPath) && oldPath.length() != 0) {
+                // navigate forward
+                fullPathAnim.setAnimation(slideIn);
+                fullPathAnim.animate().setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        super.onAnimationEnd(animation);
+                        new Handler().postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                fullPathAnim.setVisibility(View.GONE);
+                                fullPathText.setText(newPath);
+                            }
+                        }, PATH_ANIM_END_DELAY);
+                    }
 
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    super.onAnimationStart(animation);
-                    fullPathAnim.setVisibility(View.VISIBLE);
-                    fullPathAnim.setText(Utils.differenceStrings(oldPath, newPath));
-                    //fullPathText.setText(oldPath);
+                    @Override
+                    public void onAnimationStart(Animator animation) {
+                        super.onAnimationStart(animation);
+                        fullPathAnim.setVisibility(View.VISIBLE);
+                        fullPathAnim.setText(Utils.differenceStrings(oldPath, newPath));
+                        //fullPathText.setText(oldPath);
 
-                    scroll.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            pathScroll.fullScroll(View.FOCUS_RIGHT);
-                        }
-                    });
-                }
+                        scroll.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                pathScroll.fullScroll(View.FOCUS_RIGHT);
+                            }
+                        });
+                    }
 
-                @Override
-                public void onAnimationCancel(Animator animation) {
-                    super.onAnimationCancel(animation);
-                    //onAnimationEnd(animation);
-                }
-            }).setStartDelay(PATH_ANIM_START_DELAY).start();
-        } else if (newPath.length() < oldPath.length() && oldPath.contains(newPath)) {
-            // navigate backwards
-            fullPathAnim.setAnimation(slideOut);
-            fullPathAnim.animate().setListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    super.onAnimationEnd(animation);
-                    fullPathAnim.setVisibility(View.GONE);
-                    fullPathText.setText(newPath);
+                    @Override
+                    public void onAnimationCancel(Animator animation) {
+                        super.onAnimationCancel(animation);
+                        //onAnimationEnd(animation);
+                    }
+                }).setStartDelay(PATH_ANIM_START_DELAY).start();
+            } else if (newPath.length() < oldPath.length() && oldPath.contains(newPath)) {
+                // navigate backwards
+                fullPathAnim.setAnimation(slideOut);
+                fullPathAnim.animate().setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        super.onAnimationEnd(animation);
+                        fullPathAnim.setVisibility(View.GONE);
+                        fullPathText.setText(newPath);
 
-                    scroll.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            pathScroll.fullScroll(View.FOCUS_RIGHT);
-                        }
-                    });
-                }
+                        scroll.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                pathScroll.fullScroll(View.FOCUS_RIGHT);
+                            }
+                        });
+                    }
 
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    super.onAnimationStart(animation);
-                    fullPathAnim.setVisibility(View.VISIBLE);
-                    fullPathAnim.setText(Utils.differenceStrings(newPath, oldPath));
-                    fullPathText.setText(newPath);
+                    @Override
+                    public void onAnimationStart(Animator animation) {
+                        super.onAnimationStart(animation);
+                        fullPathAnim.setVisibility(View.VISIBLE);
+                        fullPathAnim.setText(Utils.differenceStrings(newPath, oldPath));
+                        fullPathText.setText(newPath);
 
-                    scroll.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            pathScroll.fullScroll(View.FOCUS_LEFT);
-                        }
-                    });
-                }
-            }).setStartDelay(PATH_ANIM_START_DELAY).start();
-        } else if (oldPath.isEmpty()) {
-            // case when app starts
-            fullPathAnim.setAnimation(slideIn);
-            fullPathAnim.setText(newPath);
-            fullPathAnim.animate().setListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    super.onAnimationStart(animation);
-                    fullPathAnim.setVisibility(View.VISIBLE);
-                    fullPathText.setText("");
-                    scroll.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            pathScroll.fullScroll(View.FOCUS_RIGHT);
-                        }
-                    });
-                }
+                        scroll.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                pathScroll.fullScroll(View.FOCUS_LEFT);
+                            }
+                        });
+                    }
+                }).setStartDelay(PATH_ANIM_START_DELAY).start();
+            } else if (oldPath.isEmpty()) {
+                // case when app starts
+                fullPathAnim.setAnimation(slideIn);
+                fullPathAnim.setText(newPath);
+                fullPathAnim.animate().setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationStart(Animator animation) {
+                        super.onAnimationStart(animation);
+                        fullPathAnim.setVisibility(View.VISIBLE);
+                        fullPathText.setText("");
+                        scroll.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                pathScroll.fullScroll(View.FOCUS_RIGHT);
+                            }
+                        });
+                    }
 
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    super.onAnimationEnd(animation);
-                    new Handler().postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            fullPathAnim.setVisibility(View.GONE);
-                            fullPathText.setText(newPath);
-                        }
-                    }, PATH_ANIM_END_DELAY);
-                }
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        super.onAnimationEnd(animation);
+                        new Handler().postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                fullPathAnim.setVisibility(View.GONE);
+                                fullPathText.setText(newPath);
+                            }
+                        }, PATH_ANIM_END_DELAY);
+                    }
 
-                @Override
-                public void onAnimationCancel(Animator animation) {
-                    super.onAnimationCancel(animation);
-                    //onAnimationEnd(animation);
-                }
-            }).setStartDelay(PATH_ANIM_START_DELAY).start();
+                    @Override
+                    public void onAnimationCancel(Animator animation) {
+                        super.onAnimationCancel(animation);
+                        //onAnimationEnd(animation);
+                    }
+                }).setStartDelay(PATH_ANIM_START_DELAY).start();
+            } else {
+                // completely different path
+                // first slide out of old path followed by slide in of new path
+                fullPathAnim.setAnimation(slideOut);
+                fullPathAnim.animate().setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationStart(Animator animator) {
+                        super.onAnimationStart(animator);
+                        fullPathAnim.setVisibility(View.VISIBLE);
+                        fullPathAnim.setText(oldPath);
+                        fullPathText.setText("");
+
+                        scroll.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                pathScroll.fullScroll(View.FOCUS_LEFT);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onAnimationEnd(Animator animator) {
+                        super.onAnimationEnd(animator);
+
+                        //fullPathAnim.setVisibility(View.GONE);
+                        fullPathAnim.setText(newPath);
+                        fullPathText.setText("");
+                        fullPathAnim.setAnimation(slideIn);
+
+                        fullPathAnim.animate().setListener(new AnimatorListenerAdapter() {
+                            @Override
+                            public void onAnimationEnd(Animator animation) {
+                                super.onAnimationEnd(animation);
+                                new Handler().postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        fullPathAnim.setVisibility(View.GONE);
+                                        fullPathText.setText(newPath);
+                                    }
+                                }, PATH_ANIM_END_DELAY);
+                            }
+
+                            @Override
+                            public void onAnimationStart(Animator animation) {
+                                super.onAnimationStart(animation);
+                                // we should not be having anything here in path bar
+                                fullPathAnim.setVisibility(View.VISIBLE);
+                                fullPathText.setText("");
+                                scroll.post(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        pathScroll.fullScroll(View.FOCUS_RIGHT);
+                                    }
+                                });
+                            }
+                        }).start();
+                    }
+
+                    @Override
+                    public void onAnimationCancel(Animator animation) {
+                        super.onAnimationCancel(animation);
+                        //onAnimationEnd(animation);
+                    }
+                }).setStartDelay(PATH_ANIM_START_DELAY).start();
+            }
         } else {
-            // completely different path
-            // first slide out of old path followed by slide in of new path
-            fullPathAnim.setAnimation(slideOut);
-            fullPathAnim.animate().setListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animator) {
-                    super.onAnimationStart(animator);
-                    fullPathAnim.setVisibility(View.VISIBLE);
-                    fullPathAnim.setText(oldPath);
-                    fullPathText.setText("");
-
-                    scroll.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            pathScroll.fullScroll(View.FOCUS_LEFT);
-                        }
-                    });
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animator) {
-                    super.onAnimationEnd(animator);
-
-                    //fullPathAnim.setVisibility(View.GONE);
-                    fullPathAnim.setText(newPath);
-                    fullPathText.setText("");
-                    fullPathAnim.setAnimation(slideIn);
-
-                    fullPathAnim.animate().setListener(new AnimatorListenerAdapter() {
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            super.onAnimationEnd(animation);
-                            new Handler().postDelayed(new Runnable() {
-                                @Override
-                                public void run() {
-                                    fullPathAnim.setVisibility(View.GONE);
-                                    fullPathText.setText(newPath);
-                                }
-                            }, PATH_ANIM_END_DELAY);
-                        }
-
-                        @Override
-                        public void onAnimationStart(Animator animation) {
-                            super.onAnimationStart(animation);
-                            // we should not be having anything here in path bar
-                            fullPathAnim.setVisibility(View.VISIBLE);
-                            fullPathText.setText("");
-                            scroll.post(new Runnable() {
-                                @Override
-                                public void run() {
-                                    pathScroll.fullScroll(View.FOCUS_RIGHT);
-                                }
-                            });
-                        }
-                    }).start();
-                }
-
-                @Override
-                public void onAnimationCancel(Animator animation) {
-                    super.onAnimationCancel(animation);
-                    //onAnimationEnd(animation);
-                }
-            }).setStartDelay(PATH_ANIM_START_DELAY).start();
+            showButtons(buttonPathInterface);
+            fullPathText.setText(newPath);
         }
     }
 

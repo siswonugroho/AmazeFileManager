@@ -2,6 +2,7 @@ package com.amaze.filemanager.adapters;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -23,7 +24,7 @@ import com.amaze.filemanager.adapters.holders.ItemViewHolder;
 import com.amaze.filemanager.adapters.holders.SpecialViewHolder;
 import com.amaze.filemanager.fragments.MainFragment;
 import com.amaze.filemanager.ui.ItemPopupMenu;
-import com.amaze.filemanager.ui.LayoutElement;
+import com.amaze.filemanager.ui.LayoutElementParcelable;
 import com.amaze.filemanager.ui.icons.Icons;
 import com.amaze.filemanager.ui.icons.MimeTypes;
 import com.amaze.filemanager.ui.views.CircleGradientDrawable;
@@ -60,6 +61,7 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
 
     private UtilitiesProviderInterface utilsProvider;
     private MainFragment mainFrag;
+    private SharedPreferences sharedPrefs;
     private boolean showHeaders;
     private ArrayList<ListItem> itemsDigested = new ArrayList<>();
     private Context context;
@@ -69,12 +71,12 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
             pdfColor, codeColor, textColor, archiveColor, genericColor;
     private int offset = 0;
 
-
-    public RecyclerAdapter(MainFragment m, UtilitiesProviderInterface utilsProvider,
-                           ArrayList<LayoutElement> itemsRaw, Context context, boolean showHeaders) {
+    public RecyclerAdapter(MainFragment m, UtilitiesProviderInterface utilsProvider, SharedPreferences sharedPrefs,
+                           ArrayList<LayoutElementParcelable> itemsRaw, Context context, boolean showHeaders) {
         this.mainFrag = m;
         this.utilsProvider = utilsProvider;
         this.context = context;
+        this.sharedPrefs = sharedPrefs;
         this.showHeaders = showHeaders;
 
         mInflater = (LayoutInflater) context.getSystemService(Activity.LAYOUT_INFLATER_SERVICE);
@@ -191,8 +193,8 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
         }
     }
 
-    public ArrayList<LayoutElement> getCheckedItems() {
-        ArrayList<LayoutElement> selected = new ArrayList<>();
+    public ArrayList<LayoutElementParcelable> getCheckedItems() {
+        ArrayList<LayoutElementParcelable> selected = new ArrayList<>();
 
         for (int i = 0; i < itemsDigested.size(); i++) {
             if (itemsDigested.get(i).getChecked() == ListItem.CHECKED) {
@@ -255,7 +257,7 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
      * after you are finished you must call createHeaders
      * @param e
      */
-    public void addItem(LayoutElement e) {
+    public void addItem(LayoutElementParcelable e) {
         if (mainFrag.IS_LIST && itemsDigested.size() > 0) {
             itemsDigested.add(itemsDigested.size()-1, new ListItem(e));
         } else if(mainFrag.IS_LIST) {
@@ -268,17 +270,17 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
         notifyItemInserted(getItemCount());
     }
 
-    public void setItems(ArrayList<LayoutElement> arrayList) {
+    public void setItems(ArrayList<LayoutElementParcelable> arrayList) {
         setItems(arrayList, true);
     }
 
-    private void setItems(ArrayList<LayoutElement> arrayList, boolean invalidate) {
+    private void setItems(ArrayList<LayoutElementParcelable> arrayList, boolean invalidate) {
         synchronized (arrayList) {
             itemsDigested.clear();
             offset = 0;
             stoppedAnimation = false;
 
-            for (LayoutElement e : arrayList) {
+            for (LayoutElementParcelable e : arrayList) {
                 itemsDigested.add(new ListItem(e));
             }
 
@@ -302,7 +304,7 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
         for (int i = 0; i < itemsDigested.size(); i++) {
             
                 if (itemsDigested.get(i).elem != null) {
-                    LayoutElement nextItem = itemsDigested.get(i).elem;
+                    LayoutElementParcelable nextItem = itemsDigested.get(i).elem;
 
                     if (!headers[0] && nextItem.isDirectory()) {
                         headers[0] = true;
@@ -393,14 +395,11 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
                 animate(holder);
                 itemsDigested.get(p).setAnimate(true);
             }
-            final LayoutElement rowItem = itemsDigested.get(p).elem;
+            final LayoutElementParcelable rowItem = itemsDigested.get(p).elem;
             if (mainFrag.IS_LIST) {
-                holder.rl.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        mainFrag.onListItemClicked(isBackButton, vholder.getAdapterPosition(), rowItem,
-                                holder.checkImageView);
-                    }
+                holder.rl.setOnClickListener(v -> {
+                    mainFrag.onListItemClicked(isBackButton, vholder.getAdapterPosition(), rowItem,
+                            holder.checkImageView);
                 });
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
@@ -411,16 +410,13 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
                             utilsProvider.getAppTheme(), mainFrag.getResources().getDisplayMetrics()));
                 }
 
-                holder.rl.setOnLongClickListener(new View.OnLongClickListener() {
-
-                    public boolean onLongClick(View p1) {
-                        // check if the item on which action is performed is not the first {goback} item
-                        if (!isBackButton) {
-                            toggleChecked(vholder.getAdapterPosition(), holder.checkImageView);
-                        }
-
-                        return true;
+                holder.rl.setOnLongClickListener(p1 -> {
+                    // check if the item on which action is performed is not the first {goback} item
+                    if (!isBackButton) {
+                        toggleChecked(vholder.getAdapterPosition(), holder.checkImageView);
                     }
+
+                    return true;
                 });
 
                 int filetype = -1;
@@ -452,35 +448,26 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
                         holder.about.setColorFilter(grey_color);
                     showPopup(holder.about, rowItem, p);
                 }
-                holder.genericIcon.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        int id = v.getId();
-                        if (id == R.id.generic_icon || id == R.id.picture_icon || id == R.id.apk_icon) {
-                            // TODO: transform icon on press to the properties dialog with animation
-                            if (!isBackButton) {
-                                toggleChecked(vholder.getAdapterPosition(), holder.checkImageView);
-                            } else mainFrag.goBack();
-                        }
-                    }
-                });
-
-                holder.pictureIcon.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
+                holder.genericIcon.setOnClickListener(v -> {
+                    int id = v.getId();
+                    if (id == R.id.generic_icon || id == R.id.picture_icon || id == R.id.apk_icon) {
+                        // TODO: transform icon on press to the properties dialog with animation
                         if (!isBackButton) {
                             toggleChecked(vholder.getAdapterPosition(), holder.checkImageView);
                         } else mainFrag.goBack();
                     }
                 });
 
-                holder.apkIcon.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        if (!isBackButton) {
-                            toggleChecked(vholder.getAdapterPosition(), holder.checkImageView);
-                        } else mainFrag.goBack();
-                    }
+                holder.pictureIcon.setOnClickListener(view -> {
+                    if (!isBackButton) {
+                        toggleChecked(vholder.getAdapterPosition(), holder.checkImageView);
+                    } else mainFrag.goBack();
+                });
+
+                holder.apkIcon.setOnClickListener(view -> {
+                    if (!isBackButton) {
+                        toggleChecked(vholder.getAdapterPosition(), holder.checkImageView);
+                    } else mainFrag.goBack();
                 });
 
                 // resetting icons visibility
@@ -501,13 +488,13 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
                                 holder.apkIcon.setVisibility(View.GONE);
                                 holder.pictureIcon.setVisibility(View.VISIBLE);
                                 holder.pictureIcon.setImageDrawable(mainFrag.DARK_IMAGE);
-                                mainFrag.ic.cancelLoad(holder.pictureIcon);
-                                mainFrag.ic.loadDrawable(holder.pictureIcon, (rowItem.getDesc()), null);
+                                mainFrag.iconHolder.cancelLoad(holder.pictureIcon);
+                                mainFrag.iconHolder.loadDrawable(holder.pictureIcon, (rowItem.getDesc()), null);
                             } else {
                                 holder.apkIcon.setVisibility(View.VISIBLE);
                                 holder.apkIcon.setImageDrawable(mainFrag.DARK_IMAGE);
-                                mainFrag.ic.cancelLoad(holder.apkIcon);
-                                mainFrag.ic.loadDrawable(holder.apkIcon, (rowItem.getDesc()), null);
+                                mainFrag.iconHolder.cancelLoad(holder.apkIcon);
+                                mainFrag.iconHolder.loadDrawable(holder.apkIcon, (rowItem.getDesc()), null);
                             }
                         }
                         break;
@@ -517,8 +504,8 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
                             holder.pictureIcon.setVisibility(View.GONE);
                             holder.apkIcon.setVisibility(View.VISIBLE);
                             holder.apkIcon.setImageDrawable(mainFrag.apk);
-                            mainFrag.ic.cancelLoad(holder.apkIcon);
-                            mainFrag.ic.loadDrawable(holder.apkIcon, (rowItem.getDesc()), null);
+                            mainFrag.iconHolder.cancelLoad(holder.apkIcon);
+                            mainFrag.iconHolder.loadDrawable(holder.apkIcon, (rowItem.getDesc()), null);
                         }
                         break;
                     case VIDEO_FILETYPE:
@@ -527,13 +514,13 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
                             if (mainFrag.CIRCULAR_IMAGES) {
                                 holder.pictureIcon.setVisibility(View.VISIBLE);
                                 holder.pictureIcon.setImageDrawable(mainFrag.DARK_VIDEO);
-                                mainFrag.ic.cancelLoad(holder.pictureIcon);
-                                mainFrag.ic.loadDrawable(holder.pictureIcon, (rowItem.getDesc()), null);
+                                mainFrag.iconHolder.cancelLoad(holder.pictureIcon);
+                                mainFrag.iconHolder.loadDrawable(holder.pictureIcon, (rowItem.getDesc()), null);
                             } else {
                                 holder.apkIcon.setVisibility(View.VISIBLE);
                                 holder.apkIcon.setImageDrawable(mainFrag.DARK_VIDEO);
-                                mainFrag.ic.cancelLoad(holder.apkIcon);
-                                mainFrag.ic.loadDrawable(holder.apkIcon, (rowItem.getDesc()), null);
+                                mainFrag.iconHolder.cancelLoad(holder.apkIcon);
+                                mainFrag.iconHolder.loadDrawable(holder.apkIcon, (rowItem.getDesc()), null);
                             }
                         }
                         break;
@@ -627,22 +614,16 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
             } else {
                 // view is a grid view
                 holder.checkImageViewGrid.setColorFilter(accentColor);
-                holder.rl.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        mainFrag.onListItemClicked(isBackButton, vholder.getAdapterPosition(), rowItem,
-                                holder.checkImageViewGrid);
-                    }
+                holder.rl.setOnClickListener(v -> {
+                    mainFrag.onListItemClicked(isBackButton, vholder.getAdapterPosition(), rowItem,
+                            holder.checkImageViewGrid);
                 });
 
-                holder.rl.setOnLongClickListener(new View.OnLongClickListener() {
-
-                    public boolean onLongClick(View p1) {
-                        if (!isBackButton) {
-                            toggleChecked(vholder.getAdapterPosition(), holder.checkImageViewGrid);
-                        }
-                        return true;
+                holder.rl.setOnLongClickListener(p1 -> {
+                    if (!isBackButton) {
+                        toggleChecked(vholder.getAdapterPosition(), holder.checkImageViewGrid);
                     }
+                    return true;
                 });
                 holder.txtTitle.setText(rowItem.getTitle());
                 holder.imageView1.setVisibility(View.INVISIBLE);
@@ -656,12 +637,12 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
                     holder.imageView1.setImageDrawable(null);
                     if (utilsProvider.getAppTheme().equals(AppTheme.DARK))
                         holder.imageView1.setBackgroundColor(Color.BLACK);
-                    mainFrag.ic.cancelLoad(holder.imageView1);
-                    mainFrag.ic.loadDrawable(holder.imageView1, (rowItem.getDesc()), null);
+                    mainFrag.iconHolder.cancelLoad(holder.imageView1);
+                    mainFrag.iconHolder.loadDrawable(holder.imageView1, (rowItem.getDesc()), null);
                 } else if (Icons.isApk((rowItem.getDesc()))) {
                     holder.genericIcon.setColorFilter(null);
-                    mainFrag.ic.cancelLoad(holder.genericIcon);
-                    mainFrag.ic.loadDrawable(holder.genericIcon, (rowItem.getDesc()), null);
+                    mainFrag.iconHolder.cancelLoad(holder.genericIcon);
+                    mainFrag.iconHolder.loadDrawable(holder.genericIcon, (rowItem.getDesc()), null);
                 }
 
                 if (rowItem.isDirectory()) {
@@ -737,51 +718,48 @@ public class RecyclerAdapter extends RecyclerArrayAdapter<String, RecyclerView.V
         }
     }
 
-    private void showPopup(View v, final LayoutElement rowItem, final int position) {
-        v.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                PopupMenu popupMenu = new ItemPopupMenu(context, mainFrag.getMainActivity(),
-                        utilsProvider, mainFrag, rowItem, view);
-                popupMenu.inflate(R.menu.item_extras);
-                String description = rowItem.getDesc().toLowerCase();
+    private void showPopup(View v, final LayoutElementParcelable rowItem, final int position) {
+        v.setOnClickListener(view -> {
+            PopupMenu popupMenu = new ItemPopupMenu(context, mainFrag.getMainActivity(),
+                    utilsProvider, mainFrag, rowItem, view, sharedPrefs);
+            popupMenu.inflate(R.menu.item_extras);
+            String description = rowItem.getDesc().toLowerCase();
 
-                if (rowItem.isDirectory()) {
-                    popupMenu.getMenu().findItem(R.id.open_with).setVisible(false);
-                    popupMenu.getMenu().findItem(R.id.share).setVisible(false);
+            if (rowItem.isDirectory()) {
+                popupMenu.getMenu().findItem(R.id.open_with).setVisible(false);
+                popupMenu.getMenu().findItem(R.id.share).setVisible(false);
 
-                    if (mainFrag.getMainActivity().mReturnIntent) {
-                        popupMenu.getMenu().findItem(R.id.return_select).setVisible(true);
-                    }
-                } else {
-                    popupMenu.getMenu().findItem(R.id.book).setVisible(false);
+                if (mainFrag.getMainActivity().mReturnIntent) {
+                    popupMenu.getMenu().findItem(R.id.return_select).setVisible(true);
                 }
-
-                if (description.endsWith(".zip") || description.endsWith(".jar")
-                        || description.endsWith(".apk") || description.endsWith(".rar")
-                        || description.endsWith(".tar") || description.endsWith(".tar.gz"))
-                    popupMenu.getMenu().findItem(R.id.ex).setVisible(true);
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-                    if (description.endsWith(CryptUtil.CRYPT_EXTENSION))
-                        popupMenu.getMenu().findItem(R.id.decrypt).setVisible(true);
-                    else popupMenu.getMenu().findItem(R.id.encrypt).setVisible(true);
-                }
-
-                popupMenu.show();
+            } else {
+                popupMenu.getMenu().findItem(R.id.book).setVisible(false);
             }
+
+            if (description.endsWith(".zip") || description.endsWith(".jar")
+                    || description.endsWith(".apk") || description.endsWith(".rar")
+                    || description.endsWith(".tar") || description.endsWith(".tar.gz"))
+                popupMenu.getMenu().findItem(R.id.ex).setVisible(true);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                if (description.endsWith(CryptUtil.CRYPT_EXTENSION))
+                    popupMenu.getMenu().findItem(R.id.decrypt).setVisible(true);
+                else popupMenu.getMenu().findItem(R.id.encrypt).setVisible(true);
+            }
+
+            popupMenu.show();
         });
     }
 
     private static class ListItem {
         public static final int CHECKED = 0, NOT_CHECKED = 1, UNCHECKABLE = 2;
 
-        private LayoutElement elem;
+        private LayoutElementParcelable elem;
         private int specialType;
         private boolean checked;
         private boolean animate;
 
-        ListItem(LayoutElement elem) {
+        ListItem(LayoutElementParcelable elem) {
             this.elem = elem;
             specialType = TYPE_ITEM;
         }

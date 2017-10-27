@@ -572,4 +572,15 @@
     <string name="typeablepaths_summary">Long press path bar type a custom path</string>
     <string name="send_email_to">Send an e-mail to</string>
     <string name="remember_password">Remember password</string>
+
+    <string name="text_editor">Text editor settings</string>
+    <string name="preference_newstack_title">Open files as new task</string>
+    <string name="preference_newstack_summary">Allows you to open files in separate tasks. Access them from system recents screen.</string>
+    <string name="github" translatable="false">GitHub</string>
+    <string name="developers">Developers</string>
+    <string name="nobitcoinapp">Please install a bitcoin wallet</string>
+
+    <string name="appbar_name" translatable="false">Amaze</string>
+    <string name="processing">Processing&#8230;</string>
+    <string name="failed_no_connection">Failed to load files. Please check your connection.</string>
 </resources>
